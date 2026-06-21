@@ -1,0 +1,99 @@
+name: 'Deploy: proxy-node → vpn3'
+
+# Deploy thủ công — proxy-node là module standalone trên vpn3.
+# Cần set secrets trước khi chạy lần đầu:
+#   VPN3_HOST, VPN3_USER, VPN3_SSH_KEY
+#   PROXY_NODE_TS_AUTHKEY  (tạo từ Admin-UI → Pre-auth Keys)
+#   PROXY_NODE_USER, PROXY_NODE_PASS  (optional, để trống = no auth)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+
+jobs:
+
+  guard:
+    name: Confirm deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: github.event.inputs.confirm != 'deploy'
+        run: echo "::error::Must type 'deploy' to confirm" && exit 1
+
+  deploy:
+    name: Deploy proxy-node → vpn3
+    runs-on: ubuntu-latest
+    needs: guard
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ghi .env từ secrets — không bao giờ commit file này
+      - name: Write .env
+        run: |
+          cat > /tmp/proxy-node.env <<'ENVEOF'
+          TS_AUTHKEY=${{ secrets.PROXY_NODE_TS_AUTHKEY }}
+          EXIT_NODE_HOSTNAME=proxy-vpn3
+          TS_LOGIN_SERVER=https://${{ secrets.CONTROL_DOMAIN }}
+          PROXY_USER=${{ secrets.PROXY_NODE_USER }}
+          PROXY_PASS=${{ secrets.PROXY_NODE_PASS }}
+          SOCKS5_PORT=1080
+          HTTP_PORT=8118
+          SOCKS5_BIND=0.0.0.0
+          HTTP_BIND=0.0.0.0
+          ADVERTISE_EXIT_NODE=false
+          ENVEOF
+
+      # Copy deploy/exit-node/ lên vpn3
+      - name: Copy deploy files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN3_HOST }}
+          username: ${{ secrets.VPN3_USER }}
+          key: ${{ secrets.VPN3_SSH_KEY }}
+          source: "deploy/exit-node/docker-compose.yml"
+          target: /opt/tailscale-remote/deploy/exit-node/
+          strip_components: 2
+
+      # Copy .env (từ /tmp — chứa secrets, không từ repo)
+      - name: Copy .env
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN3_HOST }}
+          username: ${{ secrets.VPN3_USER }}
+          key: ${{ secrets.VPN3_SSH_KEY }}
+          source: "/tmp/proxy-node.env"
+          target: /opt/tailscale-remote/deploy/exit-node/
+          strip_components: 1
+
+      # Đổi tên .env trên server và start container
+      - name: Start proxy-node
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN3_HOST }}
+          username: ${{ secrets.VPN3_USER }}
+          key: ${{ secrets.VPN3_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/tailscale-remote/deploy/exit-node
+
+            # Đổi tên .env
+            mv -f proxy-node.env .env
+
+            # Pull image mới nhất và khởi động
+            docker compose pull proxy-node
+            docker compose up -d --no-deps proxy-node
+
+            # Chờ container sẵn sàng
+            sleep 8
+            docker compose ps proxy-node
+            echo ""
+            echo "=== Logs proxy-node ==="
+            docker logs proxy-node --tail=25
+            echo ""
+            echo "=== Tailscale IP ==="
+            docker exec proxy-node tailscale ip -4 2>/dev/null || echo "(chưa join xong, kiểm tra lại sau 30s)"
+            echo "proxy-node vpn3 deploy OK"
