@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine AS derper-build
+FROM golang:alpine AS derper-build
 RUN go install tailscale.com/cmd/derper@latest
 
 FROM python:3.12-alpine
