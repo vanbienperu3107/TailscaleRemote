@@ -1,5 +1,5 @@
 # Stage 1: build gost từ source — không phụ thuộc URL release cụ thể
-FROM golang:1.23-alpine AS builder
+FROM golang:alpine AS builder
 
 RUN apk add --no-cache git
 # GOBIN=fixed path để COPY không bị ảnh hưởng bởi GOARCH (cross-compile)
