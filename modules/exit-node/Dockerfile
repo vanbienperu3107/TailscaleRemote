@@ -1,12 +1,16 @@
-# Stage 1: build gost từ source — không phụ thuộc URL release cụ thể
+# Stage 1: build gost v3 từ source
+# (gost v2/ginuerzh bị broken do obfs4 dep đổi sang gitlab, không fix được)
 FROM golang:alpine AS builder
 
 RUN apk add --no-cache git
-# GOBIN=fixed path để COPY không bị ảnh hưởng bởi GOARCH (cross-compile)
-ENV CGO_ENABLED=0 GOBIN=/usr/local/bin
-RUN go install github.com/ginuerzh/gost@latest
 
-# Stage 2: tailscale (Alpine) + gost binary
+WORKDIR /src
+RUN git clone --depth=1 https://github.com/go-gost/gost.git .
+
+# Build static binary — BuildKit set GOARCH tự động cho cross-compile
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /usr/local/bin/gost ./cmd/gost/
+
+# Stage 2: tailscale (Alpine) + gost v3 binary
 FROM tailscale/tailscale:latest
 
 RUN apk add --no-cache iptables ip6tables
