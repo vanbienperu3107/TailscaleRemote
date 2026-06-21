@@ -1,0 +1,37 @@
+{
+  "version": "1.0.0",
+  "description": "Api-center public API contract — thay đổi ở đây trigger dependent module tests",
+  "endpoints": {
+    "derpmap": {
+      "path": "/derpmap.json",
+      "method": "GET",
+      "consumers": ["derp-controller"],
+      "schema": {
+        "Regions": "object<regionId, Region>",
+        "Region.Nodes": "array<DERPNode>"
+      }
+    },
+    "metrics_report": {
+      "path": "/api/metrics/report",
+      "method": "POST",
+      "consumers": ["client-mod", "derp-relay"],
+      "schema": {
+        "hostname": "string",
+        "ipv4": "string",
+        "mac": "string",
+        "samples": "array<{dst, rtt_ms, path, ok}>"
+      }
+    },
+    "internal_derp_map": {
+      "path": "/api/internal/derp-map/:nodeKey",
+      "method": "GET",
+      "consumers": ["derp-controller"],
+      "auth": "X-Headscale-Secret header"
+    }
+  },
+  "breaking_change_rules": [
+    "derpmap schema change → must test derp-controller integration",
+    "metrics_report schema change → must test client-mod + derp-relay",
+    "internal_derp_map change → must test derp-controller Feature B"
+  ]
+}

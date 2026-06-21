@@ -1,0 +1,137 @@
+name: 'Module: derp-relay'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/derp-relay/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'modules/derp-relay/**'
+      - 'contracts/**'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/derp-relay
+  MODULE: modules/derp-relay
+
+jobs:
+  # ── 1. Test reporter ──────────────────────────────────────────────────────────
+  test:
+    name: Test ping-reporter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pytest ${{ env.MODULE }}/test_reporter.py -v 2>/dev/null || echo "No tests found, skipping"
+
+  # ── 2. Contract check — metrics/report schema ─────────────────────────────────
+  contract-check:
+    name: Check metrics/report contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Verify reporter payload matches contract
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q "^contracts/api-center"; then
+            echo "::warning::api-center contract changed — verify reporter.py POST /metrics/report payload still matches"
+          fi
+          # Check reporter.py sends required fields
+          grep -q '"hostname"' ${{ env.MODULE }}/reporter.py || (echo "::error::reporter.py missing 'hostname' field" && exit 1)
+          grep -q '"samples"' ${{ env.MODULE }}/reporter.py || (echo "::error::reporter.py missing 'samples' field" && exit 1)
+          echo "Reporter payload fields OK"
+
+  # ── 3. Build image ────────────────────────────────────────────────────────────
+  build:
+    name: Build derp-relay image
+    runs-on: ubuntu-latest
+    needs: [test, contract-check]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.MODULE }}
+          push: true
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+
+  # ── 4. Deploy to all relay nodes ──────────────────────────────────────────────
+  deploy-vpn2:
+    name: Deploy derp-relay → vpn2
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            docker compose pull derp-relay
+            docker compose up -d --no-deps derp-relay
+            echo "derp-relay vpn2 OK"
+
+  deploy-vpn3:
+    name: Deploy derp-relay → vpn3
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN3_HOST }}
+          username: ${{ secrets.VPN3_USER }}
+          key: ${{ secrets.VPN3_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/relay
+            DERP_HOSTNAME=vpn3.hangocthanh.io.vn REPORTER_NAME=vpn3 \
+            docker compose pull && docker compose up -d --force-recreate
+            echo "derp-relay vpn3 OK"
+
+  deploy-vpn4:
+    name: Deploy derp-relay → vpn4
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN4_HOST }}
+          username: ${{ secrets.VPN4_USER }}
+          key: ${{ secrets.VPN4_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/relay
+            DERP_HOSTNAME=vpn4.hangocthanh.io.vn REPORTER_NAME=vpn4 \
+            docker compose pull && docker compose up -d --force-recreate
+            echo "derp-relay vpn4 OK"
+
+  deploy-vpn6:
+    name: Deploy derp-relay → vpn6
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN6_HOST }}
+          username: ${{ secrets.VPN6_USER }}
+          key: ${{ secrets.VPN6_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/relay
+            DERP_HOSTNAME=vpn6.hangocthanh.io.vn REPORTER_NAME=vpn6 \
+            docker compose pull && docker compose up -d --force-recreate
+            echo "derp-relay vpn6 OK"

@@ -1,0 +1,52 @@
+name: 'Module: collector-sidecar'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/collector-sidecar/**'
+  pull_request:
+    paths:
+      - 'modules/collector-sidecar/**'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/collector-sidecar
+  MODULE: modules/collector-sidecar
+
+jobs:
+  build:
+    name: Build collector-sidecar image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.MODULE }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+
+  deploy:
+    name: Deploy collector-sidecar to vpn2
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            docker compose pull collector-sidecar
+            docker compose up -d --no-deps collector-sidecar
+            echo "collector-sidecar deployed OK"

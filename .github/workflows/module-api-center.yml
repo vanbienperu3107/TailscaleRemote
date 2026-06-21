@@ -1,0 +1,102 @@
+name: 'Module: api-center'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/api-center/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'modules/api-center/**'
+      - 'contracts/**'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/api-center
+  MODULE: modules/api-center
+
+jobs:
+  # ── 1. Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: Test api-center
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.MODULE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ env.MODULE }}/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npm test 2>/dev/null || npx vitest run
+
+  # ── 2. Contract diff check ────────────────────────────────────────────────────
+  contract-check:
+    name: Check API contract impact
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Detect contract changes
+        id: contract
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q "^contracts/"; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "::warning::API contract changed — downstream modules (derp-controller, client-mod, derp-relay) must be verified"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Detect derpmap schema change
+        if: steps.contract.outputs.changed == 'true'
+        run: |
+          echo "::warning::/derpmap.json schema may have changed — run derp-controller integration test"
+          echo "::warning::/metrics/report schema may have changed — check client-mod and derp-relay reporters"
+
+  # ── 3. Build & push image ─────────────────────────────────────────────────────
+  build:
+    name: Build & push api-center image
+    runs-on: ubuntu-latest
+    needs: [test, contract-check]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.MODULE }}
+          push: true
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+
+  # ── 4. Deploy to vpn2 ────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy api-center to vpn2
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            docker compose pull api-center
+            docker compose up -d --no-deps api-center
+            docker compose exec -T api-center wget -qO- http://localhost:8787/healthz | grep -q ok
+            echo "api-center deployed OK"

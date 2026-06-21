@@ -1,0 +1,147 @@
+services:
+
+  # ─── DERP-Controller (control plane thuần — không còn embedded relay) ───────
+  derp-controller:
+    image: ghcr.io/vanbienperu3107/headscale:0.27.1-pernode
+    container_name: derp-controller
+    restart: unless-stopped
+    command: serve
+    depends_on:
+      api-center:
+        condition: service_healthy
+    environment:
+      - HEADSCALE_OIDC_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - HEADSCALE_OIDC_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - HEADSCALE_DERP_DASHBOARD_SECRET=${HEADSCALE_DASHBOARD_SECRET}
+    volumes:
+      - ./config:/etc/headscale
+      - derp_controller_data:/var/lib/headscale
+      - derp_controller_run:/var/run/headscale
+    ports:
+      - "3478:3478/udp"   # STUN (không còn dùng embedded derper)
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+
+  # ─── Api-center (hub API trung tâm) ──────────────────────────────────────────
+  api-center:
+    image: ghcr.io/vanbienperu3107/api-center:latest
+    container_name: api-center
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - PORT=8787
+      - PUBLIC_URL=https://vpn2.hangocthanh.io.vn/app
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ALLOWED_EMAILS=${ALLOWED_EMAILS}
+      - HEADSCALE_API_KEY=${HEADSCALE_API_KEY}
+      - HEADSCALE_API_URL=http://derp-controller:8080
+      - HEADSCALE_DASHBOARD_SECRET=${HEADSCALE_DASHBOARD_SECRET}
+      - AUTH_OPTIONAL=false
+      - NODE_ENV=production
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8787/healthz 2>/dev/null | grep -q ok || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  # ─── Admin-UI (giao diện admin thuần tĩnh) ───────────────────────────────────
+  admin-ui:
+    image: ghcr.io/vanbienperu3107/admin-ui:latest
+    container_name: admin-ui
+    restart: unless-stopped
+
+  # ─── DERP Relay vpn2 (relay độc lập — cùng image với vpn3/4/6) ───────────────
+  derp-relay:
+    image: ghcr.io/vanbienperu3107/derp-relay:latest
+    container_name: derp-relay
+    restart: unless-stopped
+    environment:
+      - DERP_HOSTNAME=vpn2.hangocthanh.io.vn
+      - DERP_CERTMODE=manual
+      - DERP_CERTDIR=/certs
+      - DERP_HTTP_PORT=8080
+      - DERP_VERIFY_CLIENTS=true
+      # ping-reporter disabled trên vpn2 (collector chính là vpn2)
+      - REPORTER_NAME=
+    volumes:
+      - derp_relay_certs:/certs
+    ports:
+      - "3479:3478/udp"   # STUN relay (3478 đã dùng bởi derp-controller STUN)
+
+  # ─── Latency (thu thập latency report) ───────────────────────────────────────
+  latency:
+    image: ghcr.io/vanbienperu3107/latency:latest
+    container_name: latency
+    restart: unless-stopped
+    environment:
+      - HS_API_URL=http://derp-controller:8080
+      - HS_API_KEY=${HEADSCALE_API_KEY}
+      - POLL_INTERVAL=30
+      - DB_PATH=/data/devices.db
+      - DRY_RUN=${DEDUP_DRY_RUN:-false}
+      - AUTO_APPROVE_ROUTES=${AUTO_APPROVE_ROUTES:-true}
+      - METRICS_PORT=8090
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+    volumes:
+      - latency_data:/data
+      - ts_sock:/var/run/tailscale
+    depends_on:
+      - derp-controller
+
+  # ─── Collector Sidecar (tailscale + socat — cung cấp tailnet IP cho latency) ─
+  collector-sidecar:
+    image: ghcr.io/vanbienperu3107/collector-sidecar:latest
+    container_name: collector-sidecar
+    hostname: collector
+    restart: unless-stopped
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_EXTRA_ARGS=--login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+      - FORWARD_TARGET=latency:8090
+      - FORWARD_PORT=8090
+    volumes:
+      - collector_state:/var/lib/tailscale
+      - ts_sock:/var/run/tailscale
+    devices:
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - derp-controller
+      - latency
+
+  # ─── Gateway (TLS + routing) ──────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ../../modules/gateway
+      dockerfile: Dockerfile
+    container_name: gateway
+    restart: unless-stopped
+    depends_on:
+      - derp-controller
+      - api-center
+      - admin-ui
+      - latency
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - gateway_data:/data
+      - gateway_config:/config
+
+volumes:
+  derp_controller_data:
+  derp_controller_run:
+  derp_relay_certs:
+  latency_data:
+  collector_state:
+  ts_sock:
+  gateway_data:
+  gateway_config:

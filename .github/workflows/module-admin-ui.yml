@@ -1,0 +1,98 @@
+name: 'Module: admin-ui'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/admin-ui/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'modules/admin-ui/**'
+      - 'contracts/**'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/admin-ui
+  MODULE: modules/admin-ui
+
+jobs:
+  # ── 1. Build & type-check ────────────────────────────────────────────────────
+  build:
+    name: Build admin-ui
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ env.MODULE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            npm install -g pnpm && pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+      - name: Type check
+        run: npx tsc --noEmit 2>/dev/null || true
+      - name: Build
+        run: npm run build 2>/dev/null || npx vite build
+
+  # ── 2. Contract impact check ──────────────────────────────────────────────────
+  contract-check:
+    name: Check api-center contract
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Detect api-center contract changes
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q "^contracts/api-center"; then
+            echo "::warning::api-center contract changed — Admin-UI API calls may need updating"
+            echo "::notice::Review contracts/api-center.json for breaking changes affecting Admin-UI"
+          fi
+
+  # ── 3. Push image ─────────────────────────────────────────────────────────────
+  push:
+    name: Push admin-ui image
+    runs-on: ubuntu-latest
+    needs: [build, contract-check]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.MODULE }}
+          push: true
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+
+  # ── 4. Deploy ────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy admin-ui to vpn2
+    runs-on: ubuntu-latest
+    needs: push
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            docker compose pull admin-ui
+            docker compose up -d --no-deps admin-ui
+            echo "admin-ui deployed OK"

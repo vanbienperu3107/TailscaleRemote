@@ -1,0 +1,74 @@
+import { existsSync } from 'node:fs'
+import Fastify from 'fastify'
+import cookie from '@fastify/cookie'
+import cors from '@fastify/cors'
+import { env, googleEnabled } from './env.js'
+import { migrate } from './db/migrate.js'
+import { seedIfEmpty } from './db/seed.js'
+import { seedFromEnv, startAutoRefresh } from './lib/apikey-manager.js'
+import { authRoutes } from './routes/auth.js'
+import { apikeyRoutes } from './routes/apikey.js'
+import { ciRoutes } from './routes/ci.js'
+import { derpRoutes } from './routes/derp.js'
+import { derpmapRoutes } from './routes/derpmap.js'
+import { headscalePublicRoutes, headscaleRoutes } from './routes/headscale.js'
+import { healthRoutes } from './routes/health.js'
+import { forceRouteRoutes } from './routes/force-routes.js'
+import { nodeAssignmentsPublicRoutes, nodeAssignmentsRoutes } from './routes/node-assignments.js'
+
+async function main() {
+  const app = Fastify({ logger: { level: 'info' } })
+
+  await app.register(cookie, { secret: env.SESSION_SECRET })
+  if (env.CORS_ORIGIN) {
+    await app.register(cors, { origin: env.CORS_ORIGIN.split(','), credentials: true })
+  }
+
+  // Routes
+  await app.register(healthRoutes)
+  await app.register(derpmapRoutes)
+  await app.register(authRoutes)
+  await app.register(derpRoutes)
+  await app.register(headscalePublicRoutes)
+  await app.register(headscaleRoutes)
+  await app.register(forceRouteRoutes)
+  await app.register(nodeAssignmentsPublicRoutes)
+  await app.register(nodeAssignmentsRoutes)
+  await app.register(ciRoutes)
+  await app.register(apikeyRoutes)
+
+  // SPA tĩnh (prod)
+  if (env.CLIENT_DIST && existsSync(env.CLIENT_DIST)) {
+    const fastifyStatic = (await import('@fastify/static')).default
+    await app.register(fastifyStatic, { root: env.CLIENT_DIST })
+    app.setNotFoundHandler((req, reply) => {
+      const url = req.raw.url ?? ''
+      if (
+        url.startsWith('/api') ||
+        url.startsWith('/derpmap.json') ||
+        url.startsWith('/healthz')
+      ) {
+        return reply.code(404).send({ error: 'not_found' })
+      }
+      return reply.sendFile('index.html')
+    })
+  }
+
+  // DB init
+  await migrate()
+  const seed = await seedIfEmpty()
+  app.log.info({ seed, googleEnabled }, 'db ready')
+
+  // Headscale API key: seed từ env (chỉ nếu DB chưa có), rồi bắt đầu auto-refresh 24h
+  const seeded = await seedFromEnv()
+  if (seeded) app.log.info('headscale apikey: seeded from env var')
+  startAutoRefresh((msg) => app.log.info(msg))
+
+  await app.listen({ host: '0.0.0.0', port: env.PORT })
+  app.log.info(`DERP backend :${env.PORT} (public: ${env.PUBLIC_URL})`)
+}
+
+main().catch((err) => {
+  console.error('fatal:', err)
+  process.exit(1)
+})

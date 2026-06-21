@@ -1,0 +1,60 @@
+import { existsSync } from 'node:fs'
+import process from 'node:process'
+import { z } from 'zod'
+
+// Dev: nạp .env nếu có (prod/Docker lấy env từ compose nên không cần).
+if (existsSync('.env')) {
+  try {
+    process.loadEnvFile('.env')
+  } catch {
+    /* Node < 20.12 không có loadEnvFile — bỏ qua, dùng env hệ thống */
+  }
+}
+
+const schema = z.object({
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  PORT: z.coerce.number().default(8787),
+  PUBLIC_URL: z.string().url().default('http://localhost:8787'),
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
+  SESSION_SECRET: z.string().default('dev-insecure-change-me-please-32chars'),
+  ALLOWED_EMAILS: z.string().default(''),
+  SEED_DERP_YAML: z.string().optional(),
+  EMBEDDED_HOSTNAME: z.string().default('vpn2.hangocthanh.io.vn'),
+  EMBEDDED_IPV4: z.string().default('165.22.12.169'),
+  CORS_ORIGIN: z.string().default(''),
+  CLIENT_DIST: z.string().default(''),
+  // Headscale API (machines/users). Key = headscale apikey (HEADPLANE_HS_API_KEY).
+  HEADSCALE_API_URL: z.string().default('http://headscale:8080'),
+  HEADSCALE_API_KEY: z.string().default(''),
+  // [deprecated] node-dedup collector — thay bằng POST /api/metrics/report sau Feature L.
+  NODEDEDUP_URL: z.string().default('http://node-dedup:8090'),
+  // Shared secret cho endpoint POST /api/metrics/report (gửi từ metrics-report.ps1).
+  // Để trống = bỏ qua kiểm tra (chỉ dùng trong môi trường dev nội bộ).
+  METRICS_SHARED_SECRET: z.string().default(''),
+  // Secret mà headscale patch gửi kèm header X-Headscale-Secret khi gọi GET /api/internal/derp-map/:nodeKey.
+  // Để trống = không kiểm tra (chỉ dùng trong dev). Cấu hình trong headscale config: derp.dashboard.secret.
+  HEADSCALE_DASHBOARD_SECRET: z.string().default(''),
+  // Private key SSH để quản lý firewall iptables trên DERP nodes (Feature C).
+  // Nội dung PEM (bắt đầu bằng -----BEGIN ...). Trong Docker: dùng env var hoặc secret mount.
+  DERP_SSH_PRIVATE_KEY: z.string().default(''),
+  // GitHub Actions (tab Deploy & CI). PAT read actions; repos phẩy ngăn cách.
+  GITHUB_TOKEN: z.string().default(''),
+  GITHUB_REPOS: z
+    .string()
+    .default('vanbienperu3107/shadcnAdminCustom,vanbienperu3107/deployHeadscale'),
+  // 'true' = bỏ qua đăng nhập (CHỈ dev/local để xem UI khi chưa cấu hình Google).
+  AUTH_OPTIONAL: z.string().default('false'),
+  NODE_ENV: z.string().default('development'),
+})
+
+export const env = schema.parse(process.env)
+
+/** Danh sách email được phép đăng nhập, normalize lowercase. */
+export const allowedEmails = env.ALLOWED_EMAILS.split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean)
+
+export const isProd = env.NODE_ENV === 'production'
+export const googleEnabled = !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET)
+export const authOptional = env.AUTH_OPTIONAL === 'true'

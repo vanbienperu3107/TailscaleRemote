@@ -1,0 +1,70 @@
+name: 'Deploy: full stack vpn2'
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm full stack redeploy'
+        required: true
+
+jobs:
+  guard:
+    name: Confirm deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: github.event.inputs.confirm != 'deploy'
+        run: echo "::error::Must type 'deploy' to confirm" && exit 1
+
+  deploy:
+    name: Full stack deploy vpn2
+    runs-on: ubuntu-latest
+    needs: guard
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write .env
+        run: |
+          cat > /tmp/vpn2.env <<EOF
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          ALLOWED_EMAILS=${{ secrets.ALLOWED_EMAILS }}
+          HEADSCALE_API_KEY=${{ secrets.HEADSCALE_API_KEY }}
+          HEADSCALE_DASHBOARD_SECRET=${{ secrets.HEADSCALE_DASHBOARD_SECRET }}
+          TS_AUTHKEY=${{ secrets.TS_AUTHKEY }}
+          DEDUP_DRY_RUN=false
+          AUTO_APPROVE_ROUTES=true
+          EOF
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          source: "deploy/vpn2/"
+          target: /opt/tailscale-remote/
+          strip_components: 0
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          source: "/tmp/vpn2.env"
+          target: /opt/tailscale-remote/deploy/vpn2/.env
+          strip_components: 1
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            docker compose pull
+            docker compose up -d --remove-orphans
+            sleep 10
+            docker compose ps
+            # Smoke test
+            docker compose exec -T api-center wget -qO- http://localhost:8787/healthz | grep -q ok && echo "api-center OK"
+            docker compose exec -T derp-controller headscale version && echo "derp-controller OK"
+            echo "Full stack deploy DONE"

@@ -1,0 +1,24 @@
+services:
+
+  # ─── DERP Relay + ping-reporter (cùng image cho mọi relay node) ──────────────
+  derp-relay:
+    image: ghcr.io/vanbienperu3107/derp-relay:latest
+    container_name: derp-relay
+    restart: unless-stopped
+    network_mode: host        # cần host network để STUN UDP hoạt động đúng
+    environment:
+      - DERP_HOSTNAME=${DERP_HOSTNAME}          # vpn3.hangocthanh.io.vn / vpn4... / vpn6...
+      - DERP_CERTMODE=letsencrypt
+      - DERP_HTTP_PORT=80
+      - DERP_STUN_PORT=3478
+      - DERP_VERIFY_CLIENTS=true
+      - REPORTER_NAME=${REPORTER_NAME}          # vpn3 / vpn4 / vpn6
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+      - COLLECTOR_PORT=8090
+      - POLL_INTERVAL=30
+    volumes:
+      - /var/run/tailscale:/var/run/tailscale:ro   # socket tailscale host
+      - derp_certs:/root/.local/share/caddy
+
+volumes:
+  derp_certs:
