@@ -10,6 +10,7 @@ on:
     paths:
       - 'modules/derp-relay/**'
       - 'contracts/**'
+  workflow_dispatch:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/derp-relay

@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'modules/collector-sidecar/**'
+  workflow_dispatch:
 
 env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/collector-sidecar

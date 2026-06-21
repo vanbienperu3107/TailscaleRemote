@@ -1,0 +1,173 @@
+name: 'Check: module versions on vpn2 vs GHCR'
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check-versions:
+    name: Compare running versions vs GHCR latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch running digests from vpn2
+        id: running
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            echo "=== docker compose ps ==="
+            docker compose ps
+            echo ""
+            echo "=== docker compose images ==="
+            docker compose images
+            echo ""
+            echo "=== running image digests ==="
+            for svc in api-center admin-ui derp-relay latency collector-sidecar gateway; do
+              digest=$(docker inspect --format='{{index .RepoDigests 0}}' \
+                $(docker compose ps -q $svc 2>/dev/null) 2>/dev/null \
+                | grep -oP 'sha256:[a-f0-9]+' || echo "not-running")
+              echo "RUNNING|${svc}|${digest}"
+            done
+
+      - name: Compare digests with GHCR latest
+        env:
+          OWNER: vanbienperu3107
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MODULES="api-center admin-ui derp-relay latency collector-sidecar gateway"
+
+          echo ""
+          printf "%-22s %-20s %-22s %-22s %-10s\n" \
+            "MODULE" "IMAGE" "RUNNING DIGEST" "GHCR LATEST DIGEST" "STATUS"
+          printf "%0.s-" {1..100}
+          echo ""
+
+          any_outdated=false
+
+          for module in $MODULES; do
+            image="ghcr.io/${OWNER}/${module}:latest"
+
+            # Pull latest manifest digest from GHCR (no docker pull needed)
+            ghcr_digest=$(docker manifest inspect "${image}" 2>/dev/null \
+              | python3 -c "
+          import sys, json
+          m = json.load(sys.stdin)
+          # Prefer the config digest as the canonical image digest
+          for k in ('config', 'Config'):
+              if k in m:
+                  print(m[k].get('digest',''))
+                  sys.exit(0)
+          # Fallback: first manifest in list
+          mlist = m.get('manifests', [])
+          if mlist:
+              print(mlist[0].get('digest',''))
+          " 2>/dev/null || echo "unavailable")
+
+            # Short form for display
+            ghcr_short=$(echo "$ghcr_digest" | cut -c1-19)
+            run_short="unknown"   # placeholder; real value comes from SSH step above
+
+            if [ "$ghcr_digest" = "unavailable" ]; then
+              status="GHCR-ERR"
+            else
+              status="OK"
+            fi
+
+            printf "%-22s %-20s %-22s %-22s %-10s\n" \
+              "${module}" "${image##ghcr.io/}" "${run_short}..." "${ghcr_short}..." "${status}"
+          done
+
+          echo ""
+          echo "NOTE: Running digest column requires cross-step artifact."
+          echo "      See 'Fetch running digests from vpn2' step output for actual digests."
+          echo ""
+          echo "=== Full GHCR digests ==="
+          for module in $MODULES; do
+            image="ghcr.io/${OWNER}/${module}:latest"
+            digest=$(docker manifest inspect "${image}" 2>/dev/null \
+              | python3 -c "
+          import sys, json
+          try:
+              m = json.load(sys.stdin)
+              for k in ('config', 'Config'):
+                  if k in m:
+                      print(m[k].get('digest',''))
+                      sys.exit(0)
+              mlist = m.get('manifests', [])
+              if mlist:
+                  print(mlist[0].get('digest',''))
+          except:
+              print('unavailable')
+          " 2>/dev/null || echo "unavailable")
+            echo "GHCR|${module}|${digest}"
+          done
+
+      - name: Detect outdated modules (vpn2 SSH comparison)
+        uses: appleboy/ssh-action@v1
+        env:
+          OWNER: vanbienperu3107
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          envs: OWNER
+          script: |
+            echo ""
+            echo "=== Version comparison: running vs GHCR latest ==="
+            printf "%-22s %-72s %-72s %-12s\n" "MODULE" "RUNNING DIGEST" "GHCR LATEST" "STATUS"
+            printf "%0.s-" $(seq 1 160)
+            echo ""
+
+            any_outdated=false
+
+            for module in api-center admin-ui derp-relay latency collector-sidecar gateway; do
+              image="ghcr.io/${OWNER}/${module}:latest"
+
+              # Digest of locally running container
+              container_id=$(docker ps --filter "name=^${module}$" -q 2>/dev/null | head -1)
+              if [ -z "$container_id" ]; then
+                running_digest="(not running)"
+              else
+                running_digest=$(docker inspect --format='{{index .RepoDigests 0}}' \
+                  "$container_id" 2>/dev/null | grep -oP 'sha256:[a-f0-9]+' || echo "unknown")
+              fi
+
+              # Digest of latest image on GHCR (requires registry login or public access)
+              ghcr_digest=$(docker manifest inspect "${image}" 2>/dev/null \
+                | python3 -c "
+            import sys, json
+            try:
+                m = json.load(sys.stdin)
+                for k in ('config','Config'):
+                    if k in m:
+                        print(m[k].get('digest',''))
+                        sys.exit(0)
+                mlist = m.get('manifests',[])
+                if mlist: print(mlist[0].get('digest',''))
+                else: print('unavailable')
+            except: print('unavailable')
+            " 2>/dev/null || echo "unavailable")
+
+              if [ "$running_digest" = "$ghcr_digest" ] && [ "$ghcr_digest" != "unavailable" ]; then
+                status="UP-TO-DATE"
+              elif [ "$ghcr_digest" = "unavailable" ]; then
+                status="GHCR-ERROR"
+              elif [ "$running_digest" = "(not running)" ]; then
+                status="NOT-RUNNING"
+              else
+                status="OUTDATED"
+                any_outdated=true
+              fi
+
+              printf "%-22s %-72s %-72s %-12s\n" \
+                "${module}" "${running_digest}" "${ghcr_digest}" "${status}"
+            done
+
+            echo ""
+            if [ "$any_outdated" = "true" ]; then
+              echo "::warning:: One or more modules are OUTDATED — consider re-running the module CI or deploying manually."
+            else
+              echo "All checked modules are up-to-date with GHCR latest."
+            fi
