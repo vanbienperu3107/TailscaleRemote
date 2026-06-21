@@ -1,0 +1,50 @@
+services:
+
+  # ─── Proxy Node ───────────────────────────────────────────────────────────────
+  # Module hoàn toàn độc lập — deploy trên BẤT KỲ VPS nào:
+  #
+  #   cp .env.example .env && vim .env
+  #   docker compose up -d
+  #
+  # Cách hoạt động:
+  #   1. Container join tailnet như 1 client thường (không ảnh hưởng node khác)
+  #   2. Chạy SOCKS5 proxy (:1080) + HTTP proxy (:8118) trong nội bộ tailnet
+  #   3. Thành viên set proxy → <tailscale-ip-của-node>:1080
+  #   4. Traffic đi qua internet connection của VPS này
+  #
+  # KHÔNG cần cài thêm gì trên các node khác — chỉ cần set proxy trong app/OS.
+  proxy-node:
+    image: ghcr.io/vanbienperu3107/exit-node:latest
+    container_name: proxy-node
+    restart: unless-stopped
+    hostname: ${EXIT_NODE_HOSTNAME:-proxy-node}
+    environment:
+      # Tailscale join
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - EXIT_NODE_HOSTNAME=${EXIT_NODE_HOSTNAME:-proxy-node}
+      - TS_LOGIN_SERVER=${TS_LOGIN_SERVER}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SOCKET=/var/run/tailscale/tailscaled.sock
+      # Proxy auth (khuyến nghị — để trống nếu chỉ dùng trong tailnet private)
+      - PROXY_USER=${PROXY_USER:-}
+      - PROXY_PASS=${PROXY_PASS:-}
+      # Tùy chọn: cũng quảng bá làm Tailscale exit-node (đồng thời với proxy)
+      - ADVERTISE_EXIT_NODE=${ADVERTISE_EXIT_NODE:-false}
+    ports:
+      # SOCKS5 — thành viên set: socks5://<ts-ip>:1080
+      - "${SOCKS5_BIND:-0.0.0.0}:${SOCKS5_PORT:-1080}:1080"
+      # HTTP CONNECT proxy — thành viên set: http://<ts-ip>:8118
+      - "${HTTP_BIND:-0.0.0.0}:${HTTP_PORT:-8118}:8118"
+    volumes:
+      - proxy_node_state:/var/lib/tailscale
+    devices:
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+
+volumes:
+  proxy_node_state:
