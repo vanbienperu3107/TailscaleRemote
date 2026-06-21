@@ -1,0 +1,231 @@
+name: 'Deploy: HA control plane (vpn2 + vpn6)'
+
+# Deploy manual — cần gõ "deploy" để xác nhận.
+# Deploy theo thứ tự: vpn2 trước → health check → vpn6 sau (rolling, không downtime).
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm HA control plane redeploy'
+        required: true
+      target:
+        description: 'Deploy target: "both" (default), "vpn2", or "vpn6"'
+        default: 'both'
+        required: false
+
+jobs:
+  guard:
+    name: Confirm deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check confirmation
+        if: github.event.inputs.confirm != 'deploy'
+        run: echo "::error::Must type 'deploy' to confirm" && exit 1
+
+  # ── Deploy vpn2 ──────────────────────────────────────────────────────────────
+  deploy-vpn2:
+    name: Deploy control plane → vpn2
+    runs-on: ubuntu-latest
+    needs: guard
+    if: github.event.inputs.target == 'both' || github.event.inputs.target == 'vpn2'
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # Ghi .env từ secrets
+      - name: Write .env
+        run: |
+          cat > /tmp/vpn2.env << 'ENVEOF'
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          DOMAIN=${{ secrets.CONTROL_DOMAIN }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          ALLOWED_EMAILS=${{ secrets.ALLOWED_EMAILS }}
+          HEADSCALE_API_KEY=${{ secrets.HEADSCALE_API_KEY }}
+          HEADSCALE_DASHBOARD_SECRET=${{ secrets.HEADSCALE_DASHBOARD_SECRET }}
+          PUBLIC_URL=https://${{ secrets.CONTROL_DOMAIN }}/app
+          HEADSCALE_API_URL=http://derp-controller:8080
+          HS_API_URL=http://derp-controller:8080
+          HS_DB_HOST=${{ secrets.HS_DB_HOST }}
+          HS_DB_NAME=${{ secrets.HS_DB_NAME }}
+          HS_DB_USER=${{ secrets.HS_DB_USER }}
+          HS_DB_PASS=${{ secrets.HS_DB_PASS }}
+          TS_AUTHKEY=${{ secrets.TS_AUTHKEY }}
+          TS_EXTRA_ARGS=--login-server=https://${{ secrets.CONTROL_DOMAIN }} --hostname=collector --accept-dns=false
+          DEDUP_DRY_RUN=false
+          AUTO_APPROVE_ROUTES=true
+          DERP_PROBE_URLS=${{ secrets.DERP_PROBE_URLS }}
+          ENVEOF
+
+      # Ghi noise_private.key từ secret (base64-encoded)
+      # Tạo lần đầu: cat /var/lib/headscale/noise_private.key | base64 → store as HEADSCALE_NOISE_KEY
+      - name: Prepare noise key
+        run: |
+          mkdir -p /tmp/headscale-keys
+          echo "${{ secrets.HEADSCALE_NOISE_KEY }}" | base64 -d > /tmp/headscale-keys/noise_private.key
+          chmod 600 /tmp/headscale-keys/noise_private.key
+
+      # Copy deploy files lên vpn2
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          source: "deploy/vpn2/"
+          target: /opt/tailscale-remote/
+          strip_components: 0
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          source: "/tmp/vpn2.env"
+          target: /opt/tailscale-remote/deploy/vpn2/.env
+          strip_components: 1
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          source: "/tmp/headscale-keys/noise_private.key"
+          target: /opt/tailscale-remote/deploy/vpn2/headscale-keys/noise_private.key
+          strip_components: 1
+
+      # Deploy và health check vpn2
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/tailscale-remote/deploy/vpn2
+
+            # Đảm bảo headscale-keys có quyền đúng
+            chmod 700 ./headscale-keys
+            chmod 600 ./headscale-keys/noise_private.key
+
+            # Rolling update control plane (không down relay + latency)
+            docker compose pull derp-controller api-center admin-ui gateway
+            docker compose up -d --no-deps derp-controller api-center admin-ui gateway
+
+            # Chờ api-center healthy
+            for i in $(seq 1 30); do
+              if docker compose exec -T api-center wget -qO- http://localhost:8787/healthz 2>/dev/null | grep -q ok; then
+                echo "api-center healthy ($i)"
+                break
+              fi
+              echo "Chờ api-center... ($i/30)"
+              sleep 3
+            done
+
+            docker compose exec -T api-center wget -qO- http://localhost:8787/healthz | grep -q ok
+            docker compose exec -T derp-controller headscale version
+            echo "vpn2 control plane OK"
+
+  # ── Deploy vpn6 (sau khi vpn2 healthy) ───────────────────────────────────────
+  deploy-vpn6:
+    name: Deploy control plane → vpn6
+    runs-on: ubuntu-latest
+    needs: [guard, deploy-vpn2]
+    # Chạy sau vpn2 kể cả khi target=vpn6 (skip deploy-vpn2 nhưng guard vẫn cần pass)
+    if: |
+      always() &&
+      needs.guard.result == 'success' &&
+      (github.event.inputs.target == 'both' || github.event.inputs.target == 'vpn6')
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write .env for vpn6
+        run: |
+          cat > /tmp/vpn6.env << 'ENVEOF'
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          SESSION_SECRET=${{ secrets.SESSION_SECRET }}
+          ALLOWED_EMAILS=${{ secrets.ALLOWED_EMAILS }}
+          HEADSCALE_API_KEY=${{ secrets.HEADSCALE_API_KEY }}
+          HEADSCALE_DASHBOARD_SECRET=${{ secrets.HEADSCALE_DASHBOARD_SECRET }}
+          PUBLIC_URL=https://${{ secrets.CONTROL_DOMAIN }}/app
+          HS_DB_HOST=${{ secrets.HS_DB_HOST }}
+          HS_DB_NAME=${{ secrets.HS_DB_NAME }}
+          HS_DB_USER=${{ secrets.HS_DB_USER }}
+          HS_DB_PASS=${{ secrets.HS_DB_PASS }}
+          ENVEOF
+
+      - name: Prepare noise key for vpn6
+        run: |
+          mkdir -p /tmp/headscale-keys
+          echo "${{ secrets.HEADSCALE_NOISE_KEY }}" | base64 -d > /tmp/headscale-keys/noise_private.key
+          chmod 600 /tmp/headscale-keys/noise_private.key
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN6_HOST }}
+          username: ${{ secrets.VPN6_USER }}
+          key: ${{ secrets.VPN6_SSH_KEY }}
+          source: "deploy/vpn6/"
+          target: /opt/tailscale-remote/
+          strip_components: 0
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN6_HOST }}
+          username: ${{ secrets.VPN6_USER }}
+          key: ${{ secrets.VPN6_SSH_KEY }}
+          source: "/tmp/vpn6.env"
+          target: /opt/tailscale-remote/deploy/vpn6/.env
+          strip_components: 1
+
+      - uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPN6_HOST }}
+          username: ${{ secrets.VPN6_USER }}
+          key: ${{ secrets.VPN6_SSH_KEY }}
+          source: "/tmp/headscale-keys/noise_private.key"
+          target: /opt/tailscale-remote/deploy/vpn6/headscale-keys/noise_private.key
+          strip_components: 1
+
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN6_HOST }}
+          username: ${{ secrets.VPN6_USER }}
+          key: ${{ secrets.VPN6_SSH_KEY }}
+          script: |
+            set -e
+            cd /opt/tailscale-remote/deploy/vpn6
+
+            chmod 700 ./headscale-keys
+            chmod 600 ./headscale-keys/noise_private.key
+
+            docker compose pull
+            docker compose up -d
+
+            # Chờ api-center healthy trên vpn6
+            for i in $(seq 1 30); do
+              if curl -sf http://127.0.0.1:18787/healthz | grep -q ok; then
+                echo "api-center vpn6 healthy ($i)"
+                break
+              fi
+              echo "Chờ api-center vpn6... ($i/30)"
+              sleep 3
+            done
+
+            curl -sf http://127.0.0.1:18787/healthz | grep -q ok
+
+            # Thêm Caddy snippet nếu chưa có
+            CADDY_CONF=/etc/caddy/Caddyfile
+            if [ -f "$CADDY_CONF" ] && ! grep -q "vpn2.hangocthanh.io.vn" "$CADDY_CONF"; then
+              echo "" >> "$CADDY_CONF"
+              echo "import /opt/tailscale-remote/deploy/vpn6/caddy-snippet.conf" >> "$CADDY_CONF"
+              caddy reload --config "$CADDY_CONF" || systemctl reload caddy || true
+              echo "Caddy snippet added and reloaded"
+            else
+              echo "Caddy snippet already present or Caddyfile not found at $CADDY_CONF"
+            fi
+
+            echo "vpn6 control plane OK"

@@ -1,0 +1,80 @@
+services:
+
+  # ─── HA Control Plane trên vpn6 ──────────────────────────────────────────────
+  # vpn6 là replica HA của control plane vpn2.
+  # Cùng Neon Postgres DB, cùng noise_private.key, cùng SESSION_SECRET.
+  # KHÔNG có Gateway (Caddy) — vpn6 dùng Caddy hệ thống hiện có.
+  # → Thêm snippet trong caddy-snippet.conf vào Caddyfile của vpn6.
+  #
+  # vpn6 đã chạy DERP relay (region 1003) riêng — không thêm relay ở đây.
+  # Latency/Collector chỉ chạy trên vpn2 (cần host tailscale sidecar).
+
+  # ─── DERP-Controller ─────────────────────────────────────────────────────────
+  derp-controller:
+    image: ghcr.io/vanbienperu3107/headscale:0.27.1-pernode
+    container_name: derp-controller
+    restart: unless-stopped
+    command: serve
+    depends_on:
+      api-center:
+        condition: service_healthy
+    environment:
+      - HEADSCALE_OIDC_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - HEADSCALE_OIDC_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - HEADSCALE_DERP_DASHBOARD_SECRET=${HEADSCALE_DASHBOARD_SECRET}
+      - HEADSCALE_DATABASE_POSTGRES_HOST=${HS_DB_HOST}
+      - HEADSCALE_DATABASE_POSTGRES_PORT=${HS_DB_PORT:-5432}
+      - HEADSCALE_DATABASE_POSTGRES_NAME=${HS_DB_NAME}
+      - HEADSCALE_DATABASE_POSTGRES_USER=${HS_DB_USER}
+      - HEADSCALE_DATABASE_POSTGRES_PASS=${HS_DB_PASS}
+      - HEADSCALE_DATABASE_POSTGRES_SSL=${HS_DB_SSL:-true}
+    volumes:
+      - ./config:/etc/headscale:ro
+      # noise_private.key — PHẢI giống hệt key trên vpn2 (cùng GitHub Secret)
+      - ./headscale-keys:/etc/headscale-keys:ro
+      - derp_controller_run:/var/run/headscale
+    # Không expose port ra ngoài — Caddy vpn6 route đến port nội bộ
+    ports:
+      - "127.0.0.1:18081:8080"   # chỉ localhost → Caddy vpn6 proxy
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv6.conf.all.forwarding=1
+
+  # ─── Api-center ──────────────────────────────────────────────────────────────
+  api-center:
+    image: ghcr.io/vanbienperu3107/api-center:latest
+    container_name: api-center
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - PORT=8787
+      - PUBLIC_URL=${PUBLIC_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ALLOWED_EMAILS=${ALLOWED_EMAILS}
+      - HEADSCALE_API_KEY=${HEADSCALE_API_KEY}
+      # api-center trên vpn6 gọi headscale qua localhost (cùng host)
+      - HEADSCALE_API_URL=http://derp-controller:8080
+      - HEADSCALE_DASHBOARD_SECRET=${HEADSCALE_DASHBOARD_SECRET}
+      - AUTH_OPTIONAL=false
+      - NODE_ENV=production
+    ports:
+      - "127.0.0.1:18787:8787"   # chỉ localhost → Caddy vpn6 proxy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8787/healthz 2>/dev/null | grep -q ok || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  # ─── Admin-UI ────────────────────────────────────────────────────────────────
+  admin-ui:
+    image: ghcr.io/vanbienperu3107/admin-ui:latest
+    container_name: admin-ui
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:80"     # chỉ localhost → Caddy vpn6 proxy
+
+volumes:
+  derp_controller_run:

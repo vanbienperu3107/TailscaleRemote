@@ -1,6 +1,7 @@
+# Config headscale cho vpn6 — GIỐNG HỆT vpn2 trừ phần listen_addr.
+# Cả 2 instance (vpn2 và vpn6) phải dùng cùng server_url và database.
+
 # === Server ===
-# CONTROL_DOMAIN là domain HA trỏ đến cả vpn2 và vpn6 qua Cloudflare LB.
-# Thay đổi server_url đồng nghĩa với việc tất cả client phải re-register.
 server_url: https://vpn2.hangocthanh.io.vn
 listen_addr: 0.0.0.0:8080
 metrics_listen_addr: 0.0.0.0:9090
@@ -8,9 +9,6 @@ grpc_listen_addr: 0.0.0.0:50443
 grpc_allow_insecure: false
 
 noise:
-  # noise_private.key được mount từ ./headscale-keys/ (bên ngoài data volume).
-  # Key này PHẢI GIỐNG NHAU trên vpn2 và vpn6. Xem GitHub Secret HEADSCALE_NOISE_KEY.
-  # Không bao giờ regenerate nếu đã có client kết nối.
   private_key_path: /etc/headscale-keys/noise_private.key
 
 # === IP Allocation ===
@@ -45,8 +43,6 @@ node:
       probe_timeout: 5s
 
 # === Database (Postgres — chia sẻ giữa vpn2 và vpn6) ===
-# Credentials được truyền qua env var vào container (xem docker-compose.yml).
-# headscale đọc HEADSCALE_DATABASE_POSTGRES_* từ environment (viper auto-env).
 database:
   type: postgres
   postgres:

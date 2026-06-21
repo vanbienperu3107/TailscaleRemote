@@ -227,6 +227,86 @@ Mỗi module deploy **độc lập** — thay đổi Admin-UI không restart Api
 
 ---
 
+## High Availability (HA)
+
+**api-center, admin-ui, DERP-Controller** chạy trên cả **vpn2 và vpn6**. Cloudflare LB phân phối traffic và tự động failover.
+
+### Kiến trúc HA
+
+```
+Internet
+    │
+    ▼
+Cloudflare (DNS LB + Health check /healthz)
+    ├── vpn2.hangocthanh.io.vn A 165.22.12.169  ← primary
+    └── vpn2.hangocthanh.io.vn A 45.119.87.220  ← vpn6 (HA replica)
+         ↕                            ↕
+  ┌──────────────┐            ┌──────────────────────┐
+  │ vpn2         │            │ vpn6 (co-host)       │
+  │ Caddy        │            │ Existing Caddy       │
+  │ derp-ctrl    ├── Neon ───►│ + caddy-snippet.conf │
+  │ api-center   │  Postgres  │ derp-ctrl (HA)       │
+  │ admin-ui     │  (shared)  │ api-center (HA)      │
+  │ derp-relay   │            │ admin-ui (HA)        │
+  │ latency      │            │ + existing relay     │
+  └──────────────┘            └──────────────────────┘
+```
+
+### Điều kiện HA
+
+1. **Neon Postgres** — dùng chung cho cả sessions, DERP registry, headscale nodes
+2. **noise_private.key giống nhau** — lưu làm `HEADSCALE_NOISE_KEY` GitHub Secret (base64)
+3. **SESSION_SECRET giống nhau** — cả 2 node verify được cookie của nhau
+4. **Cloudflare LB** — health check `/healthz` → failover tự động
+
+### Setup Cloudflare LB
+
+```text
+DNS → vpn2.hangocthanh.io.vn
+  A  165.22.12.169  (vpn2)  Proxied ✓
+  A  45.119.87.220  (vpn6)  Proxied ✓
+
+Load Balancing:
+  Pool "control-plane":
+    Origin 1: 165.22.12.169  health check: HTTPS /healthz  expect: "ok"
+    Origin 2: 45.119.87.220  health check: HTTPS /healthz  expect: "ok"
+  Failover: Round Robin → nếu 1 origin fail, tất cả traffic sang origin còn lại
+```
+
+### Lấy noise_private.key lần đầu
+
+```bash
+# Sau lần deploy đầu tiên trên vpn2:
+docker exec derp-controller cat /etc/headscale-keys/noise_private.key | base64
+# → Copy output → GitHub Secret: HEADSCALE_NOISE_KEY
+```
+
+### Deploy HA (cả 2 node)
+
+```bash
+# Qua GitHub Actions (recommended):
+gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=both
+
+# Hoặc chỉ 1 node:
+gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=vpn6
+```
+
+### GitHub Secrets bổ sung cho HA
+
+| Secret | Mô tả |
+|---|---|
+| `CONTROL_DOMAIN` | Domain HA (vpn2.hangocthanh.io.vn) |
+| `HEADSCALE_NOISE_KEY` | base64-encoded noise_private.key |
+| `HS_DB_HOST` | Neon Postgres host |
+| `HS_DB_NAME` | Neon DB name |
+| `HS_DB_USER` | Neon DB user |
+| `HS_DB_PASS` | Neon DB password |
+| `VPN6_HOST` | IP vpn6 |
+| `VPN6_USER` | SSH user vpn6 |
+| `VPN6_SSH_KEY` | SSH private key vpn6 |
+
+---
+
 ## Cách deploy lần đầu
 
 ```bash

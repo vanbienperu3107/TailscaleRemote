@@ -1,6 +1,9 @@
 services:
 
-  # ─── DERP-Controller (control plane thuần — không còn embedded relay) ───────
+  # ─── DERP-Controller (control plane — HA với vpn6) ───────────────────────────
+  # HA: cùng Neon Postgres DB + cùng noise_private.key với instance trên vpn6.
+  # Postgres credentials đọc từ HEADSCALE_DATABASE_POSTGRES_* env vars (viper).
+  # noise_private.key mount từ ./headscale-keys/ (ghi bởi deploy workflow từ secret).
   derp-controller:
     image: ghcr.io/vanbienperu3107/headscale:0.27.1-pernode
     container_name: derp-controller
@@ -13,20 +16,27 @@ services:
       - HEADSCALE_OIDC_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - HEADSCALE_OIDC_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - HEADSCALE_DERP_DASHBOARD_SECRET=${HEADSCALE_DASHBOARD_SECRET}
+      # Postgres — headscale đọc HEADSCALE_DATABASE_POSTGRES_* qua viper auto-env
+      - HEADSCALE_DATABASE_POSTGRES_HOST=${HS_DB_HOST}
+      - HEADSCALE_DATABASE_POSTGRES_PORT=${HS_DB_PORT:-5432}
+      - HEADSCALE_DATABASE_POSTGRES_NAME=${HS_DB_NAME}
+      - HEADSCALE_DATABASE_POSTGRES_USER=${HS_DB_USER}
+      - HEADSCALE_DATABASE_POSTGRES_PASS=${HS_DB_PASS}
+      - HEADSCALE_DATABASE_POSTGRES_SSL=${HS_DB_SSL:-true}
     volumes:
-      - ./config:/etc/headscale
-      - derp_controller_data:/var/lib/headscale
+      - ./config:/etc/headscale:ro
+      # noise_private.key mount riêng — PHẢI giống hệt key trên vpn6.
+      # Deploy workflow ghi từ secret HEADSCALE_NOISE_KEY vào ./headscale-keys/
+      - ./headscale-keys:/etc/headscale-keys:ro
       - derp_controller_run:/var/run/headscale
     ports:
-      - "3478:3478/udp"   # STUN — headscale tự handle cho client discovery
+      - "3478:3478/udp"   # STUN
     sysctls:
       - net.ipv4.ip_forward=1
       - net.ipv6.conf.all.forwarding=1
 
-  # ─── Api-center (hub API trung tâm) ──────────────────────────────────────────
-  # PORTABILITY: PUBLIC_URL, HEADSCALE_API_URL lấy từ .env để dễ di chuyển.
-  # Cùng host: HEADSCALE_API_URL=http://derp-controller:8080 (Docker DNS).
-  # Khác host: HEADSCALE_API_URL=https://<domain-của-derp-controller>.
+  # ─── Api-center (hub API trung tâm — HA với vpn6) ────────────────────────────
+  # Sessions lưu Neon Postgres → stateless, cả 2 instance đọc được session nhau.
   api-center:
     image: ghcr.io/vanbienperu3107/api-center:latest
     container_name: api-center
@@ -51,17 +61,15 @@ services:
       retries: 12
       start_period: 20s
 
-  # ─── Admin-UI (giao diện admin thuần tĩnh) ───────────────────────────────────
+  # ─── Admin-UI (static — HA với vpn6, zero state) ─────────────────────────────
   admin-ui:
     image: ghcr.io/vanbienperu3107/admin-ui:latest
     container_name: admin-ui
     restart: unless-stopped
 
-  # ─── DERP Relay vpn2 (relay độc lập — cùng image với vpn3/4/6) ───────────────
-  # Chạy sau Caddy: DERP_CERTMODE=manual + DERP_HTTP_PORT=8080 → serve HTTP plain.
-  # Caddy terminate TLS và reverse_proxy /derp* → derp-relay:8080.
-  # STUN port vpn2 relay: 3479 (3478 đã dùng bởi DERP-Controller STUN).
-  # → Khi thêm vpn2 relay vào Admin-UI, đặt stun_port=3479.
+  # ─── DERP Relay vpn2 (standalone — chỉ relay, không phải control plane) ──────
+  # STUN port vpn2 relay = 3479 (3478 đã dùng bởi STUN của control plane).
+  # Khi thêm vpn2 vào derpServers qua Admin-UI, đặt stun_port=3479.
   derp-relay:
     image: ghcr.io/vanbienperu3107/derp-relay:latest
     container_name: derp-relay
@@ -72,21 +80,15 @@ services:
       - DERP_CERTDIR=/certs
       - DERP_HTTP_PORT=8080
       - DERP_VERIFY_CLIENTS=true
-      # REPORTER_NAME= để trống: vpn2 relay không chạy ping-reporter
-      # (latency module đã đảm nhiệm việc ping từ vpn2)
       - REPORTER_NAME=
     volumes:
       - derp_relay_certs:/certs
     ports:
-      - "3479:3478/udp"   # STUN relay — khác port với derp-controller STUN (3478)
+      - "3479:3478/udp"   # STUN relay
 
-  # ─── Latency (thu thập + tổng hợp latency) ───────────────────────────────────
-  # PORTABILITY: HS_API_URL lấy từ .env.
-  # Cùng host: HS_API_URL=http://derp-controller:8080 (Docker DNS).
-  # Khác host: HS_API_URL=https://<domain-của-derp-controller>.
-  #
-  # COUPLING: latency + collector-sidecar PHẢI chạy cùng host vì dùng chung
-  # Unix socket tailscale qua volume ts_sock. Nếu di chuyển, di chuyển cả 2 cùng lúc.
+  # ─── Latency + Collector Sidecar ─────────────────────────────────────────────
+  # COUPLING: hai service này PHẢI chạy cùng host (chia sẻ ts_sock Unix socket).
+  # Nếu di chuyển, di chuyển cả 2 cùng lúc.
   latency:
     image: ghcr.io/vanbienperu3107/latency:latest
     container_name: latency
@@ -100,8 +102,6 @@ services:
       - AUTO_APPROVE_ROUTES=${AUTO_APPROVE_ROUTES:-true}
       - METRICS_PORT=8090
       - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-      # DERP_PROBE_URLS: override nếu thêm/bỏ relay node.
-      # Default trong Python: vpn2/vpn3/vpn4/vpn5/vpn6 URLs.
       - DERP_PROBE_URLS=${DERP_PROBE_URLS:-}
     volumes:
       - latency_data:/data
@@ -109,11 +109,6 @@ services:
     depends_on:
       - derp-controller
 
-  # ─── Collector Sidecar (tailscale + socat) ───────────────────────────────────
-  # PORTABILITY: TS_EXTRA_ARGS lấy từ .env (chứa --login-server URL).
-  # Nếu DERP-Controller đổi domain, cập nhật TS_EXTRA_ARGS trong .env.
-  #
-  # COUPLING: phải chạy cùng host với latency (chia sẻ ts_sock volume).
   collector-sidecar:
     image: ghcr.io/vanbienperu3107/collector-sidecar:latest
     container_name: collector-sidecar
@@ -137,10 +132,9 @@ services:
       - derp-controller
       - latency
 
-  # ─── Gateway (TLS termination + routing) ─────────────────────────────────────
-  # PORTABILITY: dùng image từ GHCR thay vì build tại chỗ.
-  # CI/CD module-gateway.yml tự build và push khi modules/gateway/** thay đổi.
-  # Caddyfile mount từ ./Caddyfile; domain đọc từ env var DOMAIN.
+  # ─── Gateway (TLS termination) ────────────────────────────────────────────────
+  # Chỉ chạy trên vpn2 — vpn6 dùng Caddy sẵn có.
+  # DOMAIN env var dùng cho Caddyfile {$DOMAIN} placeholder.
   gateway:
     image: ghcr.io/vanbienperu3107/gateway:latest
     container_name: gateway
@@ -160,11 +154,10 @@ services:
       - gateway_config:/config
 
 volumes:
-  derp_controller_data:
-  derp_controller_run:
   derp_relay_certs:
   latency_data:
   collector_state:
   ts_sock:
+  derp_controller_run:
   gateway_data:
   gateway_config:
