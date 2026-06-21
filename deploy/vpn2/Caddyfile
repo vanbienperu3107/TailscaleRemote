@@ -2,12 +2,16 @@
   order replace after encode
 }
 
-vpn2.hangocthanh.io.vn {
+{$DOMAIN:vpn2.hangocthanh.io.vn} {
   log { output stdout; format json }
 
-  # ── DERP relay — không auth, DERP-Controller xử lý ──────────────────────────
-  # /derp*, /key, /ts2021, /register, /api/v1, /noise → DERP-Controller
-  handle /derp*          { reverse_proxy derp-controller:8080 }
+  # ── DERP Relay (derper binary) — /derp* đi đến relay container ───────────
+  # BUG FIX: /derp* phải đến derp-relay:8080, KHÔNG phải derp-controller.
+  # derp-controller (headscale) đã tắt embedded DERP → không serve /derp path.
+  # derper binary serve: /derp (WebSocket upgrade), /derp/probe, /derp/latency-check
+  handle /derp*          { reverse_proxy derp-relay:8080 }
+
+  # ── Control plane — DERP-Controller (headscale) ───────────────────────────
   handle /key            { reverse_proxy derp-controller:8080 }
   handle /ts2021         { reverse_proxy derp-controller:8080 }
   handle /register/*     { reverse_proxy derp-controller:8080 }
@@ -16,20 +20,20 @@ vpn2.hangocthanh.io.vn {
   handle /noise          { reverse_proxy derp-controller:8080 }
   handle /generate_204   { respond 204 }
 
-  # ── Admin-UI static (public route, auth trong api-center) ────────────────────
+  # ── Admin-UI và Api-center ────────────────────────────────────────────────
   handle /app/api/*      { reverse_proxy api-center:8787 }
   handle /app/*          { reverse_proxy admin-ui:80 }
 
-  # ── Latency /stats (không còn auth riêng — chỉ dùng nội bộ qua Admin-UI) ────
+  # ── Latency diagnostics (nội bộ) ─────────────────────────────────────────
   handle /derp-status*   {
     uri strip_prefix /derp-status
     reverse_proxy latency:8090
   }
 
-  # ── Redirect root → Admin-UI ──────────────────────────────────────────────────
+  # ── Redirect root → Admin-UI ──────────────────────────────────────────────
   @root path /
   handle @root { redir * /app/ 302 }
 
-  # ── Fallback → DERP-Controller ───────────────────────────────────────────────
+  # ── Fallback → control plane ──────────────────────────────────────────────
   handle { reverse_proxy derp-controller:8080 }
 }

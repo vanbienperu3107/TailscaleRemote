@@ -1,0 +1,58 @@
+name: 'Module: gateway'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/gateway/**'
+  pull_request:
+    paths:
+      - 'modules/gateway/**'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/gateway
+  MODULE: modules/gateway
+
+jobs:
+  # ── 1. Build & push image ─────────────────────────────────────────────────────
+  # Gateway chỉ là Caddy + replace-response plugin — không có unit test riêng.
+  # Build xcaddy cần ~2-3 phút; push image để server chỉ cần docker pull, không build.
+  build:
+    name: Build & push gateway image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.MODULE }}
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
+
+  # ── 2. Deploy gateway to vpn2 ────────────────────────────────────────────────
+  deploy:
+    name: Deploy gateway to vpn2
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPN2_HOST }}
+          username: ${{ secrets.VPN2_USER }}
+          key: ${{ secrets.VPN2_SSH_KEY }}
+          script: |
+            cd /opt/tailscale-remote/deploy/vpn2
+            docker compose pull gateway
+            docker compose up -d --no-deps gateway
+            sleep 3
+            docker compose ps gateway
+            echo "gateway deployed OK"

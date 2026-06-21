@@ -1,23 +1,41 @@
 services:
 
   # ─── DERP Relay + ping-reporter (cùng image cho mọi relay node) ──────────────
+  #
+  # ĐIỀU KIỆN TIÊN QUYẾT — chạy trước khi deploy container này:
+  # 1. Cài tailscale trên HOST: curl -fsSL https://tailscale.com/install.sh | sh
+  # 2. Join tailnet:
+  #    tailscale up --login-server=https://<derp-controller-domain> \
+  #                 --authkey=<TS_AUTHKEY> \
+  #                 --hostname=<REPORTER_NAME> \
+  #                 --accept-dns=false
+  # 3. Xác nhận socket tồn tại: ls /var/run/tailscale/tailscaled.sock
+  #
+  # Lý do: ping-reporter cần tailscale LocalAPI để:
+  #   - Lấy danh sách peers tailnet (GET /localapi/v0/status)
+  #   - Ping từng peer (POST /localapi/v0/ping)
+  #   - Tìm IP của "collector" để POST latency report về
+  #
+  # PORTABILITY: Chỉ cần thay DERP_HOSTNAME và REPORTER_NAME trong .env.
+  # Image giống nhau cho mọi server — không cần rebuild khi thêm relay mới.
   derp-relay:
     image: ghcr.io/vanbienperu3107/derp-relay:latest
     container_name: derp-relay
     restart: unless-stopped
-    network_mode: host        # cần host network để STUN UDP hoạt động đúng
+    network_mode: host        # cần host network: STUN UDP 3478 + DERP TCP 443 trực tiếp
     environment:
       - DERP_HOSTNAME=${DERP_HOSTNAME}          # vpn3.hangocthanh.io.vn / vpn4... / vpn6...
-      - DERP_CERTMODE=letsencrypt
+      - DERP_CERTMODE=letsencrypt               # relay độc lập tự lấy cert (không có Caddy)
       - DERP_HTTP_PORT=80
       - DERP_STUN_PORT=3478
       - DERP_VERIFY_CLIENTS=true
-      - REPORTER_NAME=${REPORTER_NAME}          # vpn3 / vpn4 / vpn6
+      - REPORTER_NAME=${REPORTER_NAME}          # khớp với hostname tailscale (vpn3/vpn4/vpn6)
       - TS_SOCKET=/var/run/tailscale/tailscaled.sock
       - COLLECTOR_PORT=8090
       - POLL_INTERVAL=30
     volumes:
-      - /var/run/tailscale:/var/run/tailscale:ro   # socket tailscale host
+      # Socket từ tailscale HOST (cài riêng theo điều kiện tiên quyết ở trên)
+      - /var/run/tailscale:/var/run/tailscale:ro
       - derp_certs:/root/.local/share/caddy
 
 volumes:
