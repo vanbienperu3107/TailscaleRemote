@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Collector-Sidecar — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; word-break: break-all; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="derp-controller.html">DERP-Controller</a>
+    <a href="api-center.html">Api-Center</a>
+    <a href="admin-ui.html">Admin-UI</a>
+    <a href="derp-relay.html">DERP-Relay</a>
+    <a href="latency.html">Latency</a>
+    <a href="collector-sidecar.html" class="active">Collector-Sidecar</a>
+    <a href="gateway.html">Gateway</a>
+    <a href="exit-node.html">Exit-Node</a>
+    <a href="client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="../deploy/first-deploy.html">Lần đầu</a>
+    <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+    <a href="../deploy/secrets.html">Secrets</a>
+    <a href="../deploy/version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">&#8592; Trang chủ</a>
+  </nav>
+  <main>
+    <h1>Module: collector-sidecar</h1>
+    <p class="subtitle">Tailscale sidecar + socat port forward cho latency module — chạy trên vpn2</p>
+
+    <h2>Tổng quan</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">Image</div><div class="v">ghcr.io/vanbienperu3107/collector-sidecar:latest</div></div>
+      <div class="meta-item"><div class="k">Source</div><div class="v">modules/collector-sidecar/Dockerfile + entrypoint.sh</div></div>
+      <div class="meta-item"><div class="k">Stack</div><div class="v">tailscale/tailscale:latest + socat</div></div>
+      <div class="meta-item"><div class="k">Chạy trên</div><div class="v">vpn2 only (cùng host với latency)</div></div>
+      <div class="meta-item"><div class="k">Port exposed</div><div class="v">Không (chỉ nhận traffic qua tailnet)</div></div>
+    </div>
+
+    <h2>Mục đích</h2>
+    <p><code>collector-sidecar</code> là một container Tailscale chuyên dụng chạy cạnh <code>latency</code> trên vpn2, đảm nhiệm hai nhiệm vụ:</p>
+    <ol>
+      <li><strong>Join tailnet với hostname "collector"</strong> — cung cấp unix socket LocalAPI để <code>latency</code> module dùng khi tự ping các peer.</li>
+      <li><strong>socat TCP port forward</strong> — nhận traffic từ tailnet (relay nodes gửi metrics report) và forward vào <code>latency</code> container trong Docker network.</li>
+    </ol>
+    <p>Thiết kế sidecar này tách biệt network (Tailscale) khỏi application logic (<code>latency</code>), giúp <code>latency</code> không cần tự quản lý Tailscale connection.</p>
+
+    <h2>Kiến trúc</h2>
+    <pre><code>  vpn3/vpn4/vpn6                        vpn2 host
+  (relay nodes)                         +--------------------------------------+
+                                        |                                      |
+  reporter.py                           |  +----------------------------+     |
+  POST metrics/report                   |  |    collector-sidecar        |     |
+      |                                 |  |                            |     |
+      | (qua tailnet)                   |  |  tailscaled                |     |
+      +-----------------------------&gt;   |  |    hostname: collector     |     |
+                                        |  |    authkey: TS_AUTHKEY     |     |
+                                        |  |                            |     |
+                                        |  |  socat                     |     |
+                                        |  |    LISTEN :8090            |     |
+                                        |  |    -&gt; TCP:latency:8090     |     |
+                                        |  +----------+-----------------+     |
+                                        |            |                         |
+                                        |            | Docker network          |
+                                        |            v                         |
+                                        |  +----------------------------+     |
+                                        |  |       latency              |     |
+                                        |  |       :8090                |     |
+                                        |  +----------------------------+     |
+                                        |                                      |
+                                        |   ts_sock volume                     |
+                                        |   /var/run/tailscale/                |
+                                        |   tailscaled.sock &lt;---- latency      |
+                                        +--------------------------------------+</code></pre>
+
+    <h2>Dockerfile</h2>
+    <pre><code>FROM tailscale/tailscale:latest
+RUN apk add --no-cache socat
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]</code></pre>
+    <p>Base image là official Tailscale image (<code>tailscale/tailscale:latest</code> dựa trên Alpine). Chỉ thêm <code>socat</code> để làm TCP port forwarder.</p>
+
+    <h2>entrypoint.sh</h2>
+    <pre><code>#!/bin/sh
+set -e
+
+# Start tailscaled daemon
+tailscaled \
+  --state="${TS_STATE_DIR}/tailscaled.state" \
+  --socket="${TS_SOCKET}" &amp;
+TS_PID=$!
+
+sleep 3
+
+# Join tailnet
+tailscale up \
+  --authkey="${TS_AUTHKEY}" \
+  ${TS_EXTRA_ARGS}
+
+# Start socat port forward: tailnet port -&gt; latency container
+socat TCP-LISTEN:${FORWARD_PORT},fork,reuseaddr \
+      TCP:${FORWARD_TARGET} &amp;
+
+# Wait for tailscaled
+wait $TS_PID</code></pre>
+
+    <h3>Giải thích flow</h3>
+    <ol>
+      <li><strong>tailscaled start:</strong> Daemon Tailscale khởi động, tạo unix socket tại <code>TS_SOCKET</code>. Socket này được mount vào volume <code>ts_sock</code> để <code>latency</code> có thể dùng.</li>
+      <li><strong>sleep 3:</strong> Chờ tailscaled ổn định trước khi gọi <code>tailscale up</code>.</li>
+      <li><strong>tailscale up:</strong> Join tailnet với pre-auth key. <code>TS_EXTRA_ARGS</code> cho phép truyền thêm flags như <code>--login-server</code>, <code>--hostname</code>, <code>--accept-dns=false</code>.</li>
+      <li><strong>socat:</strong> Mở port <code>FORWARD_PORT</code> (8090) để nhận TCP connection, fork cho mỗi connection mới, forward đến <code>FORWARD_TARGET</code> (latency:8090) trong Docker network.</li>
+      <li><strong>wait:</strong> Block trên <code>tailscaled</code> PID để container không exit.</li>
+    </ol>
+
+    <h2>Environment Variables</h2>
+    <table>
+      <thead><tr><th>Biến</th><th>Mặc định</th><th>Bắt buộc</th><th>Mô tả</th></tr></thead>
+      <tbody>
+        <tr><td><code>TS_AUTHKEY</code></td><td>—</td><td>Có</td><td>Pre-auth key để join tailnet. Nên dùng reusable key để restart tự động re-auth</td></tr>
+        <tr><td><code>TS_EXTRA_ARGS</code></td><td>—</td><td>Không</td><td>Flags bổ sung cho <code>tailscale up</code>. Ví dụ: <code>--login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false</code></td></tr>
+        <tr><td><code>TS_STATE_DIR</code></td><td><code>/var/lib/tailscale</code></td><td>Không</td><td>Thư mục lưu state file của tailscaled</td></tr>
+        <tr><td><code>TS_SOCKET</code></td><td><code>/var/run/tailscale/tailscaled.sock</code></td><td>Không</td><td>Đường dẫn unix socket của tailscaled</td></tr>
+        <tr><td><code>FORWARD_TARGET</code></td><td><code>latency:8090</code></td><td>Không</td><td>Địa chỉ target mà socat forward đến (tên service trong Docker network)</td></tr>
+        <tr><td><code>FORWARD_PORT</code></td><td><code>8090</code></td><td>Không</td><td>Port socat lắng nghe trên tailnet interface</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Ví dụ TS_EXTRA_ARGS</h3>
+    <pre><code>--login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false</code></pre>
+    <ul>
+      <li><code>--login-server</code>: trỏ về Headscale control server.</li>
+      <li><code>--hostname=collector</code>: hostname trong tailnet. Relay nodes gửi report đến <code>collector:8090</code>.</li>
+      <li><code>--accept-dns=false</code>: không dùng Tailscale DNS (tránh conflict với DNS của host).</li>
+    </ul>
+
+    <h2>Volumes</h2>
+    <pre><code>volumes:
+  collector_state:/var/lib/tailscale     # State cua tailscaled (persist qua restart)
+  ts_sock:/var/run/tailscale             # Chia se unix socket voi latency</code></pre>
+
+    <table>
+      <thead><tr><th>Volume</th><th>Mount point</th><th>Chia sẻ với</th><th>Mục đích</th></tr></thead>
+      <tbody>
+        <tr><td><code>collector_state</code></td><td><code>/var/lib/tailscale</code></td><td>Không chia sẻ</td><td>Lưu <code>tailscaled.state</code> — node identity persist qua restart</td></tr>
+        <tr><td><code>ts_sock</code></td><td><code>/var/run/tailscale</code></td><td><code>latency</code> container</td><td>Cung cấp <code>tailscaled.sock</code> cho <code>latency</code> module dùng LocalAPI</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Lưu ý volume <code>ts_sock</code>:</strong> Đây là cơ chế kết nối chính giữa hai container. <code>latency</code> mount volume này và gọi LocalAPI qua socket để ping peers, đọc status, v.v.</div>
+
+    <h2>Yêu cầu hệ thống</h2>
+    <pre><code>devices:
+  - /dev/net/tun          # TUN device cho Tailscale
+
+cap_add:
+  - NET_ADMIN             # Can de tao/quan ly network interface</code></pre>
+    <div class="warn">Nếu không có <code>/dev/net/tun</code> hoặc <code>NET_ADMIN</code>, tailscaled sẽ fail khi tạo network interface. Đây là yêu cầu bắt buộc của Tailscale kernel mode.<br><br><code>TS_EXTRA_ARGS=--tun=userspace-networking</code> có thể bỏ qua yêu cầu TUN device, nhưng hiệu năng thấp hơn và không phải default configuration.</div>
+
+    <h2>Docker Compose snippet</h2>
+    <pre><code>collector-sidecar:
+  image: ghcr.io/vanbienperu3107/collector-sidecar:latest
+  restart: unless-stopped
+  environment:
+    TS_AUTHKEY: ${COLLECTOR_TS_AUTHKEY}
+    TS_EXTRA_ARGS: --login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false
+    TS_STATE_DIR: /var/lib/tailscale
+    TS_SOCKET: /var/run/tailscale/tailscaled.sock
+    FORWARD_TARGET: latency:8090
+    FORWARD_PORT: "8090"
+  volumes:
+    - collector_state:/var/lib/tailscale
+    - ts_sock:/var/run/tailscale
+  devices:
+    - /dev/net/tun
+  cap_add:
+    - NET_ADMIN
+
+latency:
+  image: ghcr.io/vanbienperu3107/latency:latest
+  restart: unless-stopped
+  volumes:
+    - latency_data:/data
+    - ts_sock:/var/run/tailscale   # Dung socket cua collector-sidecar
+  # ...
+
+volumes:
+  collector_state:
+  ts_sock:
+  latency_data:</code></pre>
+
+    <h2>COUPLING với latency</h2>
+    <div class="warn"><strong>collector-sidecar và latency PHẢI chạy cùng host.</strong> Không thể tách sang host khác.</div>
+    <table>
+      <thead><tr><th>Dependency</th><th>Hướng</th><th>Lý do</th></tr></thead>
+      <tbody>
+        <tr><td><code>ts_sock</code> volume</td><td>collector-sidecar → latency</td><td>latency đọc unix socket để dùng LocalAPI</td></tr>
+        <tr><td>Docker network</td><td>socat (sidecar) → latency:8090</td><td>socat forward traffic từ tailnet vào latency</td></tr>
+        <tr><td><code>FORWARD_TARGET=latency:8090</code></td><td>sidecar cần resolve hostname <code>latency</code></td><td>Phải trong cùng Docker network</td></tr>
+      </tbody>
+    </table>
+    <p>Khi di chuyển sang host mới, <strong>di chuyển cả hai container cùng lúc</strong> và đảm bảo volumes được migrate đúng cách.</p>
+
+    <h2>Lưu ý quan trọng</h2>
+    <div class="warn">
+      <ul>
+        <li><strong>Pre-auth key:</strong> Nên dùng pre-auth key loại <strong>reusable + ephemeral=false</strong> để container có thể restart mà không cần tạo key mới. Key hết hạn = container không join được tailnet = mọi relay node mất kết nối đến collector.</li>
+        <li><strong>socat fork mode:</strong> <code>fork</code> trong <code>socat TCP-LISTEN:8090,fork,...</code> cho phép xử lý nhiều connection đồng thời. Không có <code>fork</code> thì chỉ xử lý được một connection tại một thời điểm.</li>
+        <li><strong>IP mất do socat:</strong> Do socat forward TCP, collector (latency module) nhìn thấy source IP là Docker bridge, không phải IP tailnet của relay node. Đây là lý do latency module phải chấp nhận Docker network range trong IP-based auth.</li>
+        <li><strong>Restart behavior:</strong> Khi restart container, <code>collector_state</code> volume giữ node identity nên không cần re-auth từ đầu (nếu dùng reusable key). State persist đồng nghĩa node giữ nguyên IP tailnet.</li>
+        <li><strong>tailscale up idempotent:</strong> Gọi lại <code>tailscale up</code> khi đã connected chỉ cập nhật flags, không tạo node mới.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

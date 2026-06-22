@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Version Check — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .step { display: flex; gap: 16px; margin-bottom: 20px; }
+    .step-num { background: #1e3a5f; color: #38bdf8; font-weight: 700; font-size: 14px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .step-body { flex: 1; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="../modules/derp-controller.html">DERP-Controller</a>
+    <a href="../modules/api-center.html">Api-Center</a>
+    <a href="../modules/admin-ui.html">Admin-UI</a>
+    <a href="../modules/derp-relay.html">DERP-Relay</a>
+    <a href="../modules/latency.html">Latency</a>
+    <a href="../modules/collector-sidecar.html">Collector-Sidecar</a>
+    <a href="../modules/gateway.html">Gateway</a>
+    <a href="../modules/exit-node.html">Exit-Node</a>
+    <a href="../modules/client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="first-deploy.html">Lần đầu</a>
+    <a href="relay-nodes.html">Relay Nodes</a>
+    <a href="secrets.html">Secrets</a>
+    <a href="version-check.html" class="active">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">← Trang chủ</a>
+  </nav>
+
+  <main>
+    <h1>Kiểm tra phiên bản modules — Version Check</h1>
+    <p class="subtitle">last_verified_at: 2026-06-21 &nbsp;·&nbsp; applies_to: TailscaleRemote — vpn2 (primary), vpn6 (HA replica)</p>
+
+    <h2>Tổng quan</h2>
+    <p>Tài liệu này hướng dẫn:</p>
+    <ol>
+      <li>Chạy workflow tự động <code>check-versions.yml</code> để so sánh container đang chạy vs image mới nhất trên GHCR</li>
+      <li>Kiểm tra thủ công trước/sau deploy</li>
+      <li>Thực hiện rollback khi deploy gặp vấn đề</li>
+    </ol>
+    <p><strong>GHCR registry:</strong> <code>ghcr.io/vanbienperu3107/</code></p>
+    <p><strong>Modules quản lý:</strong></p>
+    <table>
+      <thead>
+        <tr><th>Module</th><th>Image name</th><th>Deploy target</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>derp-controller</td><td><code>derp-controller</code></td><td>vpn2, vpn6</td></tr>
+        <tr><td>api-center</td><td><code>api-center</code></td><td>vpn2, vpn6</td></tr>
+        <tr><td>admin-ui</td><td><code>admin-ui</code></td><td>vpn2, vpn6</td></tr>
+        <tr><td>derp-relay</td><td><code>derp-relay</code></td><td>vpn2, vpn3, vpn4, vpn6</td></tr>
+        <tr><td>latency</td><td><code>latency</code></td><td>vpn2 only</td></tr>
+        <tr><td>collector-sidecar</td><td><code>collector-sidecar</code></td><td>vpn2 only</td></tr>
+        <tr><td>gateway</td><td><code>gateway</code></td><td>vpn2 only</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Workflow tự động: check-versions.yml</h2>
+
+    <h3>Trigger thủ công</h3>
+    <pre><code># Từ D:\05. Peru\03.Taile\TailscaleRemote:
+gh workflow run check-versions.yml
+
+# Xem danh sách run gần nhất:
+gh run list --workflow=check-versions.yml --limit 5
+
+# Xem log chi tiết của run mới nhất:
+gh run list --workflow=check-versions.yml --limit 1 --json databaseId --jq '.[0].databaseId' | ForEach-Object { gh run view $_ --log }</code></pre>
+
+    <h3>Cách workflow hoạt động</h3>
+    <pre><code>check-versions.yml
+    │
+    ├─ Job: check-vpn2
+    │    ├─ SSH vào vpn2
+    │    ├─ docker compose ps (list containers + status)
+    │    ├─ docker compose images (list image digests đang chạy)
+    │    └─ Với mỗi module:
+    │         ├─ Lấy digest container đang chạy (docker inspect)
+    │         ├─ Gọi GHCR API: GET /v2/.../manifests/latest
+    │         ├─ So sánh digest
+    │         └─ Cảnh báo nếu outdated
+    │
+    └─ Job: check-vpn6
+         └─ (tương tự vpn2)</code></pre>
+
+    <h3>Đọc kết quả</h3>
+    <p>Output trong GitHub Actions log:</p>
+    <pre><code>=== VERSION CHECK vpn2 (2026-06-21 10:00:00 UTC) ===
+
+MODULE              RUNNING DIGEST          GHCR LATEST             STATUS
+derp-controller     sha256:abc123...        sha256:abc123...        ✓ UP-TO-DATE
+api-center          sha256:def456...        sha256:xyz789...        ⚠ OUTDATED
+admin-ui            sha256:ghi789...        sha256:ghi789...        ✓ UP-TO-DATE
+derp-relay          sha256:jkl012...        sha256:jkl012...        ✓ UP-TO-DATE
+latency             sha256:mno345...        sha256:mno345...        ✓ UP-TO-DATE
+collector-sidecar   sha256:pqr678...        sha256:pqr678...        ✓ UP-TO-DATE
+gateway             sha256:stu901...        sha256:stu901...        ✓ UP-TO-DATE
+
+⚠ WARNING: 1 module(s) outdated on vpn2. Run deploy-control-plane.yml to update.</code></pre>
+
+    <hr>
+
+    <h2>Kiểm tra thủ công trước deploy</h2>
+
+    <h3>1. Xem image đang chạy trên vpn2</h3>
+    <pre><code># SSH và query docker:
+ssh root@vpn2.hangocthanh.io.vn `
+  "cd /opt/tailscale-remote/deploy/vpn2 &amp;&amp; docker compose images"</code></pre>
+    <p>Output mẫu:</p>
+    <pre><code>Container          Repository                                Tag       Image Id       Size
+derp-controller    ghcr.io/vanbienperu3107/derp-controller   latest    a1b2c3d4e5f6   245MB
+api-center         ghcr.io/vanbienperu3107/api-center         latest    b2c3d4e5f6a1   312MB
+admin-ui           ghcr.io/vanbienperu3107/admin-ui           latest    c3d4e5f6a1b2   89MB
+derp-relay         ghcr.io/vanbienperu3107/derp-relay         latest    d4e5f6a1b2c3   156MB
+latency            ghcr.io/vanbienperu3107/latency            latest    e5f6a1b2c3d4   198MB
+collector-sidecar  ghcr.io/vanbienperu3107/collector-sidecar  latest    f6a1b2c3d4e5   423MB
+gateway            ghcr.io/vanbienperu3107/gateway            latest    a1b2c3d4e5f7   78MB</code></pre>
+
+    <h3>2. Xem image mới nhất trên GHCR</h3>
+    <pre><code># List tất cả packages (container images):
+gh api "repos/vanbienperu3107/TailscaleRemote/packages?package_type=container" `
+  --jq '.[] | {name: .name, updated: .updated_at}'
+
+# Xem digest latest của 1 module cụ thể (ví dụ api-center):
+gh api "users/vanbienperu3107/packages/container/api-center/versions" `
+  --jq '.[0] | {id, created_at, tags: .metadata.container.tags}'</code></pre>
+
+    <h3>3. So sánh digest đang chạy vs GHCR</h3>
+    <pre><code># SSH vào vpn2, lấy digest container đang chạy:
+docker inspect derp-controller \
+  --format '{{index .RepoDigests 0}}'
+# → ghcr.io/vanbienperu3107/derp-controller@sha256:abc123...
+
+# So sánh với digest trên GHCR (cần docker pull --dry hoặc manifest inspect):
+docker manifest inspect ghcr.io/vanbienperu3107/derp-controller:latest \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('config',{}).get('digest',''))"</code></pre>
+
+    <hr>
+
+    <h2>Bảng tracking version (template điền tay)</h2>
+    <p>Điền sau mỗi lần deploy để tracking.</p>
+    <p><strong>Deploy date:</strong> ________________ &nbsp;&nbsp; <strong>Deploy commit SHA:</strong> ________________</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Module</th>
+          <th>Image GHCR (tag/SHA)</th>
+          <th>Container vpn2 (digest)</th>
+          <th>Container vpn6 (digest)</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>derp-controller</td><td><code>ghcr.io/.../derp-controller:latest</code></td><td></td><td></td><td></td></tr>
+        <tr><td>api-center</td><td><code>ghcr.io/.../api-center:latest</code></td><td></td><td></td><td></td></tr>
+        <tr><td>admin-ui</td><td><code>ghcr.io/.../admin-ui:latest</code></td><td></td><td></td><td></td></tr>
+        <tr><td>derp-relay</td><td><code>ghcr.io/.../derp-relay:latest</code></td><td></td><td></td><td></td></tr>
+        <tr><td>latency</td><td><code>ghcr.io/.../latency:latest</code></td><td></td><td></td><td></td></tr>
+        <tr><td>collector-sidecar</td><td><code>ghcr.io/.../collector-sidecar:latest</code></td><td></td><td></td><td></td></tr>
+        <tr><td>gateway</td><td><code>ghcr.io/.../gateway:latest</code></td><td></td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Checklist sau deploy</h2>
+    <p>Chạy lần lượt các lệnh sau và đảm bảo tất cả trả kết quả mong đợi.</p>
+
+    <h3>1. Health check endpoint</h3>
+    <pre><code># vpn2:
+curl https://vpn2.hangocthanh.io.vn/healthz
+# Kết quả mong đợi: ok
+
+# Nếu dùng IP trực tiếp (bypass Cloudflare LB):
+curl --resolve "vpn2.hangocthanh.io.vn:443:165.22.12.169" `
+     https://vpn2.hangocthanh.io.vn/healthz
+# → ok
+
+curl --resolve "vpn2.hangocthanh.io.vn:443:45.119.87.220" `
+     https://vpn2.hangocthanh.io.vn/healthz
+# → ok (kiểm tra vpn6 qua Cloudflare LB)</code></pre>
+
+    <h3>2. API DERP regions</h3>
+    <pre><code># Trả về JSON array các DERP regions đã cấu hình:
+curl -s https://vpn2.hangocthanh.io.vn/app/api/derp | python3 -m json.tool
+# Kết quả mong đợi:
+# [
+#   {
+#     "id": 1,
+#     "hostname": "vpn2.hangocthanh.io.vn",
+#     "regionCode": "vpn2-vn",
+#     ...
+#   },
+#   ...
+# ]</code></pre>
+
+    <h3>3. DERP relay probe</h3>
+    <pre><code># Control plane node relay (vpn2):
+curl -v https://vpn2.hangocthanh.io.vn/derp/probe
+# → HTTP 200
+
+# Standalone relay nodes:
+curl -v https://vpn3.hangocthanh.io.vn/derp/probe
+# → HTTP 200</code></pre>
+
+    <h3>4. Headscale key endpoint (Tailscale clients dùng)</h3>
+    <pre><code>curl https://vpn2.hangocthanh.io.vn/key
+# → JSON: {"publicKey":"..."}</code></pre>
+
+    <h3>5. Container status tổng quan</h3>
+    <pre><code># SSH vào vpn2:
+ssh root@165.22.12.169 \
+  "cd /opt/tailscale-remote/deploy/vpn2 &amp;&amp; docker compose ps --format table"</code></pre>
+    <p>Kết quả mong đợi (tất cả STATUS = Up):</p>
+    <pre><code>NAME               IMAGE                                                   STATUS      PORTS
+derp-controller    ghcr.io/vanbienperu3107/derp-controller:latest          Up          ...
+api-center         ghcr.io/vanbienperu3107/api-center:latest               Up          ...
+admin-ui           ghcr.io/vanbienperu3107/admin-ui:latest                 Up          ...
+derp-relay         ghcr.io/vanbienperu3107/derp-relay:latest               Up          ...
+latency            ghcr.io/vanbienperu3107/latency:latest                  Up          ...
+collector-sidecar  ghcr.io/vanbienperu3107/collector-sidecar:latest        Up          ...
+gateway            ghcr.io/vanbienperu3107/gateway:latest                  Up          ...</code></pre>
+    <pre><code># SSH vào vpn6:
+ssh root@45.119.87.220 \
+  "cd /opt/tailscale-remote/deploy/vpn6 &amp;&amp; docker compose ps --format table"</code></pre>
+
+    <h3>6. Logs nhanh (tail 50 dòng)</h3>
+    <pre><code>ssh root@165.22.12.169 \
+  "cd /opt/tailscale-remote/deploy/vpn2 &amp;&amp; docker compose logs --tail=50 --no-log-prefix 2&gt;&amp;1"</code></pre>
+    <div class="note">Dấu hiệu bình thường:
+      <ul style="margin-top:6px">
+        <li>Không có <code>ERROR</code> level logs</li>
+        <li><code>api-center</code> log <code>Listening on :3000</code></li>
+        <li><code>derp-controller</code> log <code>headscale started</code></li>
+        <li><code>gateway</code> log <code>serving TLS</code> hoặc <code>certificate obtained successfully</code></li>
+      </ul>
+    </div>
+
+    <h3>7. Collector-sidecar tailnet status</h3>
+    <pre><code>ssh root@165.22.12.169 \
+  "docker exec collector-sidecar tailscale status"
+# → Phải hiện peers từ vpn3/vpn4</code></pre>
+
+    <hr>
+
+    <h2>Rollback — khôi phục phiên bản cũ</h2>
+
+    <h3>Rollback một module cụ thể về SHA trước đó</h3>
+    <pre><code># Bước 1: SSH vào vpn2
+ssh root@165.22.12.169
+cd /opt/tailscale-remote/deploy/vpn2
+
+# Bước 2: Tìm SHA image muốn rollback về
+# (từ GitHub Actions history hoặc GHCR tags)
+# Ví dụ SHA: sha256:def456789...
+
+# Bước 3: Pull image cụ thể:
+docker pull ghcr.io/vanbienperu3107/api-center@sha256:def456789abc...
+
+# Bước 4: Tag lại thành :latest tạm thời:
+docker tag ghcr.io/vanbienperu3107/api-center@sha256:def456789abc... \
+           ghcr.io/vanbienperu3107/api-center:rollback
+
+# Bước 5: Sửa docker-compose.yml tạm thời:
+# image: ghcr.io/vanbienperu3107/api-center:rollback
+
+# Bước 6: Restart chỉ service đó (không restart các service khác):
+docker compose up -d --no-deps api-center
+
+# Bước 7: Kiểm tra:
+docker compose ps api-center
+curl https://vpn2.hangocthanh.io.vn/app/api/derp</code></pre>
+
+    <h3>Rollback theo GitHub commit SHA (cách tốt hơn)</h3>
+    <pre><code># Tìm SHA của image từ workflow run cụ thể:
+gh run list --workflow=module-api-center.yml --limit 10
+
+# Xem output của run muốn rollback về (lấy image digest):
+gh run view &lt;RUN_ID&gt; --log | Select-String "digest"
+
+# Trigger deploy với image tag SHA cụ thể:
+# (cần workflow hỗ trợ input image_tag)
+gh workflow run deploy-control-plane.yml \
+  -f confirm=deploy \
+  -f target=vpn2 \
+  -f image_tag=sha-&lt;7-char-sha&gt;</code></pre>
+
+    <h3>Rollback toàn bộ (emergency)</h3>
+    <pre><code>ssh root@165.22.12.169
+cd /opt/tailscale-remote/deploy/vpn2
+
+# Lấy danh sách image đang dùng TRƯỚC khi deploy gần nhất:
+docker image ls --format "{{.Repository}}:{{.Tag}} {{.ID}} {{.CreatedAt}}" \
+  | grep ghcr.io/vanbienperu3107/ | sort -k3 -r
+
+# Sửa docker-compose.yml: thay tất cả :latest thành :&lt;SHA&gt; cũ
+# Sau đó:
+docker compose pull
+docker compose up -d
+
+# Kiểm tra:
+docker compose ps
+curl https://vpn2.hangocthanh.io.vn/healthz</code></pre>
+
+    <hr>
+
+    <h2>Monitoring thường xuyên</h2>
+
+    <h3>Schedule check-versions định kỳ (tùy chọn)</h3>
+    <p>Thêm vào <code>.github/workflows/check-versions.yml</code>:</p>
+    <pre><code>on:
+  schedule:
+    # Chạy mỗi ngày lúc 07:00 UTC (14:00 Việt Nam):
+    - cron: '0 7 * * *'
+  workflow_dispatch:</code></pre>
+
+    <h3>Theo dõi restart count</h3>
+    <pre><code>ssh root@165.22.12.169 \
+  "docker inspect --format='{{.Name}}: restarts={{.RestartCount}}' \$(docker ps -q)"</code></pre>
+    <div class="warn">Nếu module nào <code>restarts &gt; 3</code> → xem log ngay, container đang crash loop.</div>
+
+    <h3>Disk usage (image cache)</h3>
+    <pre><code>ssh root@165.22.12.169 "docker system df"
+# Dọn image cũ nếu disk &gt; 80%:
+ssh root@165.22.12.169 "docker image prune -f --filter 'until=168h'"
+# → Xóa image không dùng cũ hơn 7 ngày</code></pre>
+
+    <hr>
+
+    <h2>Server migration — chuyển sang VPS mới</h2>
+    <p>Khi cần thay vpn2 bằng server mới:</p>
+    <pre><code># 1. Backup state quan trọng trên vpn2 cũ:
+ssh root@165.22.12.169
+cd /opt/tailscale-remote/deploy/vpn2
+
+# Backup noise key:
+docker exec derp-controller \
+  cat /etc/headscale-keys/noise_private.key &gt; /tmp/noise_private.key.backup
+
+# Backup latency DB:
+docker run --rm \
+  -v latency_data:/data \
+  -v /tmp:/backup \
+  alpine cp /data/devices.db /backup/devices.db.backup
+
+scp root@165.22.12.169:/tmp/noise_private.key.backup .
+scp root@165.22.12.169:/tmp/devices.db.backup .
+
+# 2. Cập nhật GitHub Secrets với IP mới:
+gh secret set VPN2_HOST --body "NEW_VPS_IP"
+gh secret set VPN2_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\new_vps_key" -Raw)
+
+# 3. Cài Docker trên VPS mới (xem docs/deploy/first-deploy.md Yêu cầu)
+
+# 4. Deploy:
+gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=vpn2
+
+# 5. Restore latency DB (nếu cần giữ historical data):
+scp devices.db.backup root@NEW_VPS_IP:/tmp/
+ssh root@NEW_VPS_IP
+docker run --rm \
+  -v latency_data:/data \
+  -v /tmp:/backup \
+  alpine cp /backup/devices.db.backup /data/devices.db
+docker restart latency
+
+# 6. Cập nhật Cloudflare LB pool:
+# DNS → Load Balancing → pool → thay IP vpn2 cũ = IP mới
+
+# 7. Kiểm tra:
+curl https://vpn2.hangocthanh.io.vn/healthz
+gh workflow run check-versions.yml</code></pre>
+  </main>
+</body>
+</html>

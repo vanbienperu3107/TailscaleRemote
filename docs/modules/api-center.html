@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Api-Center — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-blue { background: #1e3a5f; color: #38bdf8; }
+    .badge-green { background: #064e3b; color: #34d399; }
+    .badge-yellow { background: #451a03; color: #fbbf24; }
+    .badge-gray { background: #1e293b; color: #94a3b8; }
+    .info-card { background: #111827; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+    .info-card .label { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .info-card .value { font-size: 13px; color: #94a3b8; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    .note { background: #1a2a1a; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1a1a00; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; }
+    .method { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; font-family: monospace; min-width: 46px; text-align: center; }
+    .get { background: #1e3a5f; color: #38bdf8; }
+    .post { background: #064e3b; color: #34d399; }
+    .patch { background: #312e81; color: #a5b4fc; }
+    .put { background: #451a7e; color: #c4b5fd; }
+    .delete { background: #450a0a; color: #fca5a5; }
+  </style>
+</head>
+<body>
+<nav>
+  <div class="logo">TailscaleRemote Docs</div>
+  <div class="section">Modules</div>
+  <a href="../modules/derp-controller.html">DERP-Controller</a>
+  <a href="../modules/api-center.html" class="active">Api-Center</a>
+  <a href="../modules/admin-ui.html">Admin-UI</a>
+  <a href="../modules/derp-relay.html">DERP-Relay</a>
+  <a href="../modules/latency.html">Latency</a>
+  <a href="../modules/collector-sidecar.html">Collector-Sidecar</a>
+  <a href="../modules/gateway.html">Gateway</a>
+  <a href="../modules/exit-node.html">Exit-Node</a>
+  <a href="../modules/client-mod.html">Client-Mod</a>
+  <div class="section">Kiến trúc</div>
+  <a href="../architecture/overview.html">Tổng quan</a>
+  <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+  <div class="section">Deploy</div>
+  <a href="../deploy/first-deploy.html">Lần đầu</a>
+  <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+  <a href="../deploy/secrets.html">Secrets</a>
+  <a href="../deploy/version-check.html">Version Check</a>
+  <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">← Trang chủ</a>
+</nav>
+<main>
+  <h1>Module: api-center</h1>
+  <p class="subtitle">Hub API trung tâm — Fastify + TypeScript + Drizzle ORM + Neon PostgreSQL</p>
+
+  <div class="meta-grid">
+    <div class="meta-item">
+      <div class="k">Image</div>
+      <div class="v"><code>ghcr.io/vanbienperu3107/api-center:latest</code></div>
+    </div>
+    <div class="meta-item">
+      <div class="k">Source</div>
+      <div class="v"><code>modules/api-center/</code></div>
+    </div>
+    <div class="meta-item">
+      <div class="k">Stack</div>
+      <div class="v">Fastify + TypeScript + Drizzle ORM + Neon PostgreSQL</div>
+    </div>
+    <div class="meta-item">
+      <div class="k">Port nội bộ</div>
+      <div class="v"><code>8787</code></div>
+    </div>
+    <div class="meta-item">
+      <div class="k">Chạy trên</div>
+      <div class="v">vpn2, vpn6 (HA replica)</div>
+    </div>
+  </div>
+
+  <div class="info-card">
+    <div class="label">Mục đích</div>
+    <div class="value">Hub API trung tâm. Toàn bộ hệ thống (Admin-UI, DERP-Controller, Latency, Client Mod) đều giao tiếp qua api-center. Không có business logic nào nằm ở client.</div>
+  </div>
+
+  <h2>API Endpoints</h2>
+
+  <h3>Auth <code>/api/auth/</code></h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/auth/google/login</code></td>
+        <td><span class="badge badge-gray">—</span></td>
+        <td>Bắt đầu Google OAuth flow, redirect Google</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/auth/google/callback</code></td>
+        <td><span class="badge badge-gray">—</span></td>
+        <td>OAuth callback, verify state, tạo session</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/auth/me</code></td>
+        <td><span class="badge badge-yellow">Optional</span></td>
+        <td>User hiện tại (401 nếu chưa login)</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/auth/logout</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Xóa session</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>DERP Nodes <code>/api/derp/</code></h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/derp</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách tất cả DERP regions (embedded đầu, rồi theo regionId)</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/derp</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Tạo DERP region mới (auto-assign regionId, tránh 999)</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/derp/next-region-id</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Xem trước regionId tiếp theo</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/derp/health</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Probe tất cả DERP nodes (song song, trả latency ms)</td>
+      </tr>
+      <tr>
+        <td><span class="method patch">PATCH</span></td>
+        <td><code>/api/derp/:regionId</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Cập nhật config region (block nếu embedded)</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/derp/:regionId/toggle</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Bật/tắt/maintenance (block nếu embedded)</td>
+      </tr>
+      <tr>
+        <td><span class="method delete">DELETE</span></td>
+        <td><code>/api/derp/:regionId</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Xóa region (block nếu embedded)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>DERPMap (public)</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/derpmap.json</code></td>
+        <td><span class="badge badge-gray">—</span></td>
+        <td>Dynamic DERPMap cho headscale poll mỗi 10s</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/internal/derp-map/:nodeKey</code></td>
+        <td><span class="badge badge-yellow">Semi-public</span></td>
+        <td>Per-node DERPMap cho Feature B</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Machines &amp; Users</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/machines</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách nodes với online status</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/nodes/:id/rename</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Đổi tên given_name</td>
+      </tr>
+      <tr>
+        <td><span class="method put">PUT</span></td>
+        <td><code>/api/nodes/:id/tags</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Set tags</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/users</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách tailnet users</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/users</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Tạo user</td>
+      </tr>
+      <tr>
+        <td><span class="method delete">DELETE</span></td>
+        <td><code>/api/users/:name</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Xóa user</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/hs-routes</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách routes đang advertise</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Pre-auth Keys &amp; ACL</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/preauthkeys</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách pre-auth keys (tất cả users)</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/preauthkeys</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Tạo pre-auth key</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/acl</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Lấy ACL policy hiện tại</td>
+      </tr>
+      <tr>
+        <td><span class="method put">PUT</span></td>
+        <td><code>/api/acl</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Cập nhật ACL policy</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Latency &amp; Metrics</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/latency</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Aggregated peer-to-peer latency từ Neon DB</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/metrics/report</code></td>
+        <td><span class="badge badge-yellow">IP-based</span></td>
+        <td>Nhận latency report từ Client Mod + DERP Relay</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">Auth cho <code>/api/metrics/report</code>: IP trong tailnet (100.x.x.x) hoặc Docker internal network. Không cần OAuth session.</div>
+
+  <h3>Force Routes</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/force-routes</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách force-route rules</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/force-routes</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Tạo rule (clientIp → regionId)</td>
+      </tr>
+      <tr>
+        <td><span class="method patch">PATCH</span></td>
+        <td><code>/api/force-routes/:id</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Cập nhật rule</td>
+      </tr>
+      <tr>
+        <td><span class="method delete">DELETE</span></td>
+        <td><code>/api/force-routes/:id</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Xóa rule</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/force-routes/sync/:regionId</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>SSH vào DERP node, apply iptables</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/force-routes/clear/:regionId</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>SSH vào DERP node, xóa chain DERP-FORCE</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Node Assignments (Feature B)</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/node-assignments</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách per-node DERP assignments</td>
+      </tr>
+      <tr>
+        <td><span class="method put">PUT</span></td>
+        <td><code>/api/node-assignments</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Gán region cho nodeKey</td>
+      </tr>
+      <tr>
+        <td><span class="method delete">DELETE</span></td>
+        <td><code>/api/node-assignments/:nodeKey</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Xóa assignment</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Settings &amp; CI</h3>
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/settings/apikey</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Headscale API key status (prefix, ngày seed/refresh)</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/settings/apikey/refresh</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Rotate Headscale API key</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/settings/apikey/webhook</code></td>
+        <td><span class="badge badge-yellow">Webhook</span></td>
+        <td>Nhận API key từ GitHub Actions deploy</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/ci</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>GitHub Actions runs gần nhất (8 per repo)</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/healthz</code></td>
+        <td><span class="badge badge-gray">—</span></td>
+        <td>Health check — DB SELECT 1, trả <code>ok</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Database Schema (Neon PostgreSQL)</h2>
+
+  <h3><code>derp_servers</code></h3>
+  <table>
+    <thead>
+      <tr><th>Column</th><th>Type</th><th>Ghi chú</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>regionId</code></td><td>int PK</td><td>999 = embedded vpn2 (read-only)</td></tr>
+      <tr><td><code>code</code></td><td>text</td><td>Ví dụ: <code>vpn3-vn</code></td></tr>
+      <tr><td><code>name</code></td><td>text</td><td>Ví dụ: <code>Vietnam - vpn3</code></td></tr>
+      <tr><td><code>nodeName</code></td><td>text</td><td>Tên node trong DERPMap</td></tr>
+      <tr><td><code>hostname</code></td><td>text</td><td>FQDN</td></tr>
+      <tr><td><code>ipv4</code></td><td>text</td><td>IP</td></tr>
+      <tr><td><code>derpPort</code></td><td>int</td><td>Default 443</td></tr>
+      <tr><td><code>stunPort</code></td><td>int</td><td>Default 3478</td></tr>
+      <tr><td><code>enabled</code></td><td>bool</td><td>false → không xuất hiện trong derpmap.json</td></tr>
+      <tr><td><code>paused</code></td><td>bool</td><td>true → maintenance score=9999, client tự chuyển</td></tr>
+      <tr><td><code>maintenance</code></td><td>bool</td><td>Giống paused, hiển thị trạng thái khác trên UI</td></tr>
+      <tr><td><code>embedded</code></td><td>bool</td><td>true = region 999 vpn2, không xóa/sửa được</td></tr>
+      <tr><td><code>priority</code></td><td>int</td><td>1–1000, default 100. Thấp hơn = ưu tiên hơn</td></tr>
+      <tr><td><code>sshUser, sshPort</code></td><td>text/int</td><td>Dùng cho force-routes iptables sync</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><strong>Logic DERPMap:</strong> <code>enabled=true AND paused=false AND embedded=false</code>. Priority → RegionScore (inverted, 0.01–10).</div>
+
+  <h3><code>latency_samples</code></h3>
+  <table>
+    <thead>
+      <tr><th>Column</th><th>Type</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>srcHostname, dstHostname</code></td><td>text (composite PK)</td></tr>
+      <tr><td><code>srcIp, mac</code></td><td>text</td></tr>
+      <tr><td><code>rttMs</code></td><td>real</td></tr>
+      <tr><td><code>path</code></td><td>text (<code>direct</code> / <code>derp:vpn3-vn</code>)</td></tr>
+      <tr><td><code>ok</code></td><td>bool</td></tr>
+      <tr><td><code>reportedAt</code></td><td>timestamp</td></tr>
+    </tbody>
+  </table>
+  <p>UPSERT mỗi lần nhận report → giữ bản mới nhất.</p>
+
+  <h3>Các bảng khác</h3>
+  <table>
+    <thead>
+      <tr><th>Bảng</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>derp_force_routes</code></td><td>Lưu (clientIp, regionId) pairs cho iptables DERP-FORCE chain</td></tr>
+      <tr><td><code>derp_node_assignments</code></td><td>Lưu (nodeKey, regionId) cho Feature B per-node DERPMap</td></tr>
+      <tr><td><code>headscale_api_keys</code></td><td>Single-row (id=1). Lưu Headscale API key hiện tại, prefix, ngày seed/refresh</td></tr>
+      <tr><td><code>users, sessions</code></td><td>OAuth user cache và session management. Session lưu DB → stateless, cả vpn2 và vpn6 đọc được session nhau (điều kiện HA)</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Environment Variables</h2>
+  <pre><code># Bắt buộc
+DATABASE_URL                    # Neon PostgreSQL connection string
+PORT                            # default 8787
+PUBLIC_URL                      # Base URL cho OAuth redirect, ví dụ: https://vpn2.hangocthanh.io.vn/app
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+SESSION_SECRET                  # 32+ ký tự random, ký cookie + webhook auth
+ALLOWED_EMAILS                  # email1@gmail.com,email2@gmail.com
+HEADSCALE_API_URL               # default http://derp-controller:8080
+HEADSCALE_API_KEY               # Headscale API key (bootstrap, sau đó lưu DB)
+HEADSCALE_DASHBOARD_SECRET      # X-Headscale-Secret header cho Feature B
+
+# Tùy chọn
+CORS_ORIGIN                     # default auto từ PUBLIC_URL
+METRICS_SHARED_SECRET           # nếu muốn auth metrics report theo secret thay IP
+DERP_SSH_PRIVATE_KEY            # PEM private key để SSH sync iptables
+GITHUB_TOKEN                    # PAT cho CI tab
+GITHUB_REPOS                    # owner/repo1,owner/repo2
+AUTH_OPTIONAL                   # true = dev mode không cần login
+NODE_ENV                        # production / development</code></pre>
+
+  <h2>Healthcheck</h2>
+  <pre><code>curl https://vpn2.hangocthanh.io.vn/healthz
+# → ok</code></pre>
+  <p>Container tự healthcheck mỗi 5s, 12 retries, start_period 20s. <code>derp-controller</code> depends_on api-center healthy.</p>
+</main>
+</body>
+</html>

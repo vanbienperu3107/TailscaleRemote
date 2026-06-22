@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HA — Active-Passive Failover — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-blue { background: #1e3a5f; color: #38bdf8; }
+    .badge-green { background: #064e3b; color: #34d399; }
+    .badge-yellow { background: #451a03; color: #fbbf24; }
+    .badge-red { background: #450a0a; color: #fca5a5; }
+    .info-card { background: #111827; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; }
+    .info-card .label { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+    .info-card .value { font-size: 13px; color: #94a3b8; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    .note { background: #1a2a1a; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1a1a00; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; }
+
+    /* ASCII diagram */
+    .diagram { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 20px 24px; margin: 12px 0 24px; font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 13px; color: #94a3b8; line-height: 1.7; }
+    .diagram .highlight { color: #38bdf8; }
+    .diagram .node-primary { color: #34d399; }
+    .diagram .node-replica { color: #a78bfa; }
+
+    /* HA requirement steps */
+    .step { background: #111827; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px 20px; margin-bottom: 12px; }
+    .step-num { display: inline-block; background: #1e3a5f; color: #38bdf8; font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 4px; margin-bottom: 8px; }
+    .step-title { font-size: 14px; font-weight: 600; color: #f1f5f9; margin-bottom: 6px; }
+  </style>
+</head>
+<body>
+<nav>
+  <div class="logo">TailscaleRemote Docs</div>
+  <div class="section">Modules</div>
+  <a href="../modules/derp-controller.html">DERP-Controller</a>
+  <a href="../modules/api-center.html">Api-Center</a>
+  <a href="../modules/admin-ui.html">Admin-UI</a>
+  <a href="../modules/derp-relay.html">DERP-Relay</a>
+  <a href="../modules/latency.html">Latency</a>
+  <a href="../modules/collector-sidecar.html">Collector-Sidecar</a>
+  <a href="../modules/gateway.html">Gateway</a>
+  <a href="../modules/exit-node.html">Exit-Node</a>
+  <a href="../modules/client-mod.html">Client-Mod</a>
+  <div class="section">Kiến trúc</div>
+  <a href="../architecture/overview.html">Tổng quan</a>
+  <a href="../architecture/ha-lb.html" class="active">HA &amp; LB</a>
+  <div class="section">Deploy</div>
+  <a href="../deploy/first-deploy.html">Lần đầu</a>
+  <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+  <a href="../deploy/secrets.html">Secrets</a>
+  <a href="../deploy/version-check.html">Version Check</a>
+  <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">← Trang chủ</a>
+</nav>
+<main>
+  <h1>High Availability — Control Plane</h1>
+  <p class="subtitle">vpn2 (PRIMARY) + vpn6 (HA REPLICA) với Cloudflare DNS Load Balancing tự động failover</p>
+
+  <h2>Tổng quan</h2>
+  <p>Control plane (derp-controller + api-center + admin-ui) chạy song song trên <strong>vpn2</strong> và <strong>vpn6</strong>. Cloudflare DNS LB điều phối traffic và tự failover khi một node down.</p>
+
+  <div class="diagram">
+    <div>Internet / Tailscale Clients</div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│</div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼</div>
+    <div><span class="highlight">☁️ Cloudflare DNS LB</span></div>
+    <div>&nbsp;&nbsp;&nbsp;<span class="highlight">vpn2.hangocthanh.io.vn</span></div>
+    <div>&nbsp;&nbsp;&nbsp;A 165.22.12.169&nbsp;&nbsp;(vpn2)&nbsp;&nbsp;health check /healthz</div>
+    <div>&nbsp;&nbsp;&nbsp;A 45.119.87.220&nbsp;&nbsp;(vpn6)&nbsp;&nbsp;health check /healthz</div>
+    <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│</div>
+    <div>&nbsp;&nbsp;&nbsp;┌────┴────┐</div>
+    <div>&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼</div>
+    <div>&nbsp;&nbsp;<span class="node-primary">vpn2</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="node-replica">vpn6</span></div>
+    <div>&nbsp;&nbsp;<span class="node-primary">PRIMARY</span>&nbsp;&nbsp;&nbsp;<span class="node-replica">HA REPLICA</span></div>
+  </div>
+
+  <h2>Những gì chạy trên từng node</h2>
+  <table>
+    <thead>
+      <tr><th>Service</th><th>vpn2 (primary)</th><th>vpn6 (HA replica)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>derp-controller</td>
+        <td><span class="badge badge-green">✅ :8080</span></td>
+        <td><span class="badge badge-blue">✅ :127.0.0.1:18081</span></td>
+      </tr>
+      <tr>
+        <td>api-center</td>
+        <td><span class="badge badge-green">✅ :8787</span></td>
+        <td><span class="badge badge-blue">✅ :127.0.0.1:18787</span></td>
+      </tr>
+      <tr>
+        <td>admin-ui</td>
+        <td><span class="badge badge-green">✅ :80</span></td>
+        <td><span class="badge badge-blue">✅ :127.0.0.1:18080</span></td>
+      </tr>
+      <tr>
+        <td>gateway (Caddy)</td>
+        <td><span class="badge badge-green">✅ container :80/:443</span></td>
+        <td><span class="badge badge-red">❌ dùng Caddy hệ thống + snippet</span></td>
+      </tr>
+      <tr>
+        <td>derp-relay</td>
+        <td><span class="badge badge-green">✅ :8080 STUN:3479</span></td>
+        <td><span class="badge badge-red">❌ không cần (vpn6 có relay riêng)</span></td>
+      </tr>
+      <tr>
+        <td>latency</td>
+        <td><span class="badge badge-green">✅ :8090</span></td>
+        <td><span class="badge badge-red">❌ chỉ vpn2</span></td>
+      </tr>
+      <tr>
+        <td>collector-sidecar</td>
+        <td><span class="badge badge-green">✅</span></td>
+        <td><span class="badge badge-red">❌ chỉ vpn2</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>HA Challenges và giải pháp</h2>
+  <table>
+    <thead>
+      <tr><th>Thành phần</th><th>Challenge</th><th>Giải pháp</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>api-center</td>
+        <td>Stateless Fastify, sessions ở Neon</td>
+        <td>Chạy cả 2 node, cùng DB + SESSION_SECRET ✓</td>
+      </tr>
+      <tr>
+        <td>admin-ui</td>
+        <td>Static files, zero state</td>
+        <td>Chạy cả 2 node trực tiếp ✓</td>
+      </tr>
+      <tr>
+        <td>derp-controller</td>
+        <td>Default SQLite = single-writer</td>
+        <td>Switch Neon Postgres + chia sẻ noise_private.key</td>
+      </tr>
+      <tr>
+        <td>noise_private.key</td>
+        <td>Phải CÙNG key 2 instance</td>
+        <td>GitHub Secret (base64) → deploy ghi ra file</td>
+      </tr>
+      <tr>
+        <td>Load Balancer</td>
+        <td>Ai route traffic?</td>
+        <td>Cloudflare DNS LB + health check /healthz</td>
+      </tr>
+      <tr>
+        <td>vpn6 Caddy</td>
+        <td>Caddy sẵn có, không cài thêm Gateway</td>
+        <td>Thêm caddy-snippet.conf vào Caddy hiện có</td>
+      </tr>
+      <tr>
+        <td>latency/collector</td>
+        <td>Cần tailscale socket local</td>
+        <td>Chỉ vpn2, không HA — acceptable</td>
+      </tr>
+      <tr>
+        <td>derp-relay vpn2</td>
+        <td>Nếu vpn2 down relay mất</td>
+        <td>Client fallback sang vpn3/vpn4/vpn6 relay ✓</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Điều kiện HA bắt buộc</h2>
+
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-title">Neon Postgres làm backend headscale</div>
+    <p>File <code>deploy/vpn2/config/config.yaml</code> và <code>deploy/vpn6/config/config.yaml</code> phải cấu hình:</p>
+    <pre><code>database:
+  type: postgres
+  postgres:
+    host: ${HS_DB_HOST}
+    port: 5432
+    name: ${HS_DB_NAME}
+    user: ${HS_DB_USER}
+    password: ${HS_DB_PASS}
+    ssl: true</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-title">noise_private.key giống nhau</div>
+    <pre><code># Lần đầu: lấy key từ vpn2 sau deploy đầu tiên
+docker exec derp-controller cat /etc/headscale-keys/noise_private.key | base64
+# → Copy → GitHub Secret: HEADSCALE_NOISE_KEY
+
+# Deploy workflow tự động decode và ghi ra file:
+echo "$HEADSCALE_NOISE_KEY" | base64 -d > ./headscale-keys/noise_private.key</code></pre>
+  </div>
+
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-title">SESSION_SECRET giống nhau</div>
+    <p>Cùng một giá trị trên cả 2 node → sessions của vpn2 và vpn6 verify được nhau.</p>
+  </div>
+
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-title">DATABASE_URL giống nhau</div>
+    <p>Cùng Neon Postgres cho cả 2 node → api-center stateless, sessions lưu DB.</p>
+  </div>
+
+  <h2>Cloudflare Failover Setup</h2>
+  <div class="warn">Không dùng <strong>Round Robin</strong> — headscale không hỗ trợ active-active. headscale duy trì WebSocket dài hạn với từng client; round-robin sẽ gây reconnect liên tục và có thể race condition khi 2 instance ghi Postgres đồng thời. Dùng <strong>Failover Priority</strong>: vpn2 nhận 100% traffic, vpn6 chỉ activate khi vpn2 fail.</div>
+  <pre><code>Cloudflare Dashboard → DNS → Load Balancing
+
+Pool PRIMARY (Priority 1):
+  Origin: 165.22.12.169 (vpn2)
+
+Pool STANDBY (Priority 2):
+  Origin: 45.119.87.220 (vpn6)
+
+  Origin 1: 165.22.12.169 (vpn2)
+  Origin 2: 45.119.87.220 (vpn6)
+
+Health check:
+  Type: HTTPS
+  Path: /healthz
+  Expected body: ok
+  Interval: 60s
+  Timeout: 5s
+  Healthy threshold: 1
+  Unhealthy threshold: 2
+
+Load Balancer:
+  Hostname: vpn2.hangocthanh.io.vn
+  Steering: Failover    ← KHÔNG phải Round Robin
+  Behavior: Route sang Priority 2 (vpn6) CHỈ KHI Priority 1 (vpn2) fail health check</code></pre>
+
+  <h2>vpn6 Caddy Snippet</h2>
+  <p>File <code>deploy/vpn6/caddy-snippet.conf</code> được thêm vào Caddyfile hệ thống của vpn6.</p>
+  <p>Deploy workflow tự động:</p>
+  <ol>
+    <li>Copy file lên <code>/opt/tailscale-remote/deploy/vpn6/caddy-snippet.conf</code></li>
+    <li>Check nếu chưa có <code>import</code> thì thêm vào <code>/etc/caddy/Caddyfile</code></li>
+    <li>Chạy <code>caddy reload</code></li>
+  </ol>
+
+  <h4>Routing table vpn6:</h4>
+  <pre><code>vpn2.hangocthanh.io.vn {
+  /derp*              → 127.0.0.1:18081  # derp-ctrl (không có relay)
+  /key /ts2021 /...   → 127.0.0.1:18081  # headscale endpoints
+  /api/v1/*           → 127.0.0.1:18081
+  /app/api/*          → 127.0.0.1:18787  # api-center
+  /app/*              → 127.0.0.1:18080  # admin-ui
+  /healthz            → 127.0.0.1:18787  # Cloudflare health check
+  /                   → redirect /app/
+}</code></pre>
+
+  <h2>Deploy HA</h2>
+  <pre><code># Deploy cả 2 node (rolling, không downtime):
+gh workflow run deploy-control-plane.yml \
+  -f confirm=deploy \
+  -f target=both
+
+# Chỉ vpn2:
+gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=vpn2
+
+# Chỉ vpn6:
+gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=vpn6</code></pre>
+
+  <div class="note"><strong>Thứ tự deploy:</strong> vpn2 → health check pass → vpn6. Nếu vpn2 deploy đang chạy và /healthz fail tạm thời, Cloudflare sẽ tự route 100% sang vpn6 trong thời gian đó.</div>
+
+  <h2>Secrets cần cho HA</h2>
+  <table>
+    <thead>
+      <tr><th>Secret</th><th>Dùng bởi</th><th>Mô tả</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>HEADSCALE_NOISE_KEY</code></td>
+        <td>deploy-control-plane.yml</td>
+        <td>noise_private.key (base64). <strong>Phải giống nhau cả 2 node</strong></td>
+      </tr>
+      <tr>
+        <td><code>SESSION_SECRET</code></td>
+        <td>api-center vpn2+vpn6</td>
+        <td>Cookie signing. <strong>Phải giống nhau</strong></td>
+      </tr>
+      <tr>
+        <td><code>DATABASE_URL</code></td>
+        <td>api-center vpn2+vpn6</td>
+        <td>Neon Postgres</td>
+      </tr>
+      <tr>
+        <td><code>HS_DB_HOST/NAME/USER/PASS</code></td>
+        <td>derp-controller vpn2+vpn6</td>
+        <td>Headscale Postgres</td>
+      </tr>
+      <tr>
+        <td><code>VPN6_HOST</code></td>
+        <td>deploy workflow</td>
+        <td>IP vpn6</td>
+      </tr>
+      <tr>
+        <td><code>VPN6_USER</code></td>
+        <td>deploy workflow</td>
+        <td>SSH user vpn6</td>
+      </tr>
+      <tr>
+        <td><code>VPN6_SSH_KEY</code></td>
+        <td>deploy workflow</td>
+        <td>SSH private key vpn6</td>
+      </tr>
+      <tr>
+        <td><code>CONTROL_DOMAIN</code></td>
+        <td>deploy workflow</td>
+        <td>vpn2.hangocthanh.io.vn</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

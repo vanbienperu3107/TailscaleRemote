@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gateway (Caddy) — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; word-break: break-all; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="derp-controller.html">DERP-Controller</a>
+    <a href="api-center.html">Api-Center</a>
+    <a href="admin-ui.html">Admin-UI</a>
+    <a href="derp-relay.html">DERP-Relay</a>
+    <a href="latency.html">Latency</a>
+    <a href="collector-sidecar.html">Collector-Sidecar</a>
+    <a href="gateway.html" class="active">Gateway</a>
+    <a href="exit-node.html">Exit-Node</a>
+    <a href="client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="../deploy/first-deploy.html">Lần đầu</a>
+    <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+    <a href="../deploy/secrets.html">Secrets</a>
+    <a href="../deploy/version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">&#8592; Trang chủ</a>
+  </nav>
+  <main>
+    <h1>Module: gateway</h1>
+    <p class="subtitle">Caddy v2 reverse proxy + TLS termination — vpn2 (container) và vpn6 (caddy-snippet)</p>
+
+    <h2>Tổng quan</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">Image</div><div class="v">ghcr.io/vanbienperu3107/gateway:latest</div></div>
+      <div class="meta-item"><div class="k">Source</div><div class="v">modules/gateway/Dockerfile</div></div>
+      <div class="meta-item"><div class="k">Stack</div><div class="v">Caddy v2 + plugin replace-response</div></div>
+      <div class="meta-item"><div class="k">Port</div><div class="v">80 (ACME HTTP challenge), 443 (HTTPS public)</div></div>
+      <div class="meta-item"><div class="k">Chạy trên</div><div class="v">vpn2 (containerized); vpn6 (Caddy hệ thống + caddy-snippet.conf)</div></div>
+    </div>
+
+    <h2>Mục đích</h2>
+    <p>Module <code>gateway</code> là reverse proxy và TLS termination point cho toàn bộ stack trên vpn2. Caddy xử lý:</p>
+    <ul>
+      <li><strong>TLS tự động</strong> qua Let's Encrypt ACME.</li>
+      <li><strong>Routing</strong> tất cả request vào đúng backend service theo path pattern.</li>
+      <li><strong>DERP relay</strong> — forward <code>/derp*</code> vào <code>derp-relay</code> container (không phải <code>derp-controller</code>).</li>
+      <li><strong>Headscale control</strong> — forward <code>/key</code>, <code>/ts2021</code>, <code>/register/*</code>, <code>/machine/*</code>, <code>/api/v1/*</code>, <code>/noise</code> vào <code>derp-controller</code>.</li>
+      <li><strong>Dashboard</strong> — <code>/app/*</code> vào <code>admin-ui</code>, <code>/app/api/*</code> vào <code>api-center</code>.</li>
+    </ul>
+
+    <h2>Dockerfile</h2>
+    <pre><code>FROM caddy:2-builder AS builder
+RUN xcaddy build --with github.com/caddyserver/replace-response
+
+FROM caddy:2
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy</code></pre>
+    <p>Multi-stage build: stage 1 dùng <code>xcaddy</code> để compile Caddy với plugin <code>replace-response</code>, stage 2 là Caddy runtime image với binary đã được thay thế.</p>
+    <div class="note"><strong>Lý do cần plugin <code>replace-response</code>:</strong> Dùng để rewrite content trong response nếu cần (ví dụ: đổi URL nội bộ thành URL public trong response JSON của Headscale).</div>
+
+    <h2>Caddyfile</h2>
+    <p>File: <code>deploy/vpn2/Caddyfile</code></p>
+    <pre><code>{
+  order replace after encode
+}
+
+{$DOMAIN:vpn2.hangocthanh.io.vn} {
+  log { output stdout; format json }
+
+  handle /derp*          { reverse_proxy derp-relay:8080 }
+  handle /key            { reverse_proxy derp-controller:8080 }
+  handle /ts2021         { reverse_proxy derp-controller:8080 }
+  handle /register/*     { reverse_proxy derp-controller:8080 }
+  handle /machine/*      { reverse_proxy derp-controller:8080 }
+  handle /api/v1/*       { reverse_proxy derp-controller:8080 }
+  handle /noise          { reverse_proxy derp-controller:8080 }
+  handle /generate_204   { respond 204 }
+  handle /app/api/*      { reverse_proxy api-center:8787 }
+  handle /app/*          { reverse_proxy admin-ui:80 }
+  handle /derp-status*   {
+    uri strip_prefix /derp-status
+    reverse_proxy latency:8090
+  }
+  @root path /
+  handle @root { redir * /app/ 302 }
+  handle { reverse_proxy derp-controller:8080 }
+}</code></pre>
+
+    <h2>Routing table</h2>
+    <table>
+      <thead><tr><th>Path pattern</th><th>Backend</th><th>Port</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><code>/derp*</code></td><td><code>derp-relay</code></td><td><code>8080</code></td><td>DERP WebSocket relay. <strong>KHÔNG phải derp-controller</strong></td></tr>
+        <tr><td><code>/key</code></td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Tailscale key exchange</td></tr>
+        <tr><td><code>/ts2021</code></td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Tailscale protocol 2021</td></tr>
+        <tr><td><code>/register/*</code></td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Node registration</td></tr>
+        <tr><td><code>/machine/*</code></td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Machine API</td></tr>
+        <tr><td><code>/api/v1/*</code></td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Headscale REST API</td></tr>
+        <tr><td><code>/noise</code></td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Noise protocol endpoint</td></tr>
+        <tr><td><code>/generate_204</code></td><td>—</td><td>—</td><td>Connectivity check, trả <code>204 No Content</code></td></tr>
+        <tr><td><code>/app/api/*</code></td><td><code>api-center</code></td><td><code>8787</code></td><td>Backend API của dashboard</td></tr>
+        <tr><td><code>/app/*</code></td><td><code>admin-ui</code></td><td><code>80</code></td><td>Frontend dashboard (SPA)</td></tr>
+        <tr><td><code>/derp-status*</code></td><td><code>latency</code></td><td><code>8090</code></td><td>DERP status page (strip prefix <code>/derp-status</code>)</td></tr>
+        <tr><td><code>/</code> (exact)</td><td>—</td><td>—</td><td>Redirect <code>302</code> → <code>/app/</code></td></tr>
+        <tr><td><code>*</code> (fallback)</td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Mọi path không khớp → Headscale</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Thứ tự ưu tiên</h3>
+    <p>Caddy xử lý <code>handle</code> theo thứ tự khai báo (first match wins). <code>/app/api/*</code> phải đứng trước <code>/app/*</code> để tránh <code>/app/api/</code> bị route nhầm vào <code>admin-ui</code>.</p>
+
+    <h2>TLS (HTTPS)</h2>
+    <p>Caddy tự động xử lý TLS qua Let's Encrypt ACME:</p>
+    <ul>
+      <li><strong>Port 80:</strong> ACME HTTP-01 challenge. Caddy lắng nghe và tự trả lời challenge để lấy cert.</li>
+      <li><strong>Port 443:</strong> HTTPS với cert đã được cấp.</li>
+      <li><strong>Auto-renewal:</strong> Caddy tự gia hạn cert trước khi hết hạn. Không cần cron job.</li>
+    </ul>
+    <div class="warn">TLS cert được lưu trong volume <code>gateway_data</code> (<code>/data</code>). Mất volume = mất cert = cần renew lại (tự động nhưng mất thời gian challenge).</div>
+
+    <h2>Environment Variables</h2>
+    <table>
+      <thead><tr><th>Biến</th><th>Mặc định</th><th>Bắt buộc</th><th>Mô tả</th></tr></thead>
+      <tbody>
+        <tr><td><code>DOMAIN</code></td><td><code>vpn2.hangocthanh.io.vn</code></td><td>Không</td><td>Domain chính. Caddy dùng giá trị này cho virtual host và ACME cert</td></tr>
+      </tbody>
+    </table>
+    <p>Cú pháp <code>{$DOMAIN:vpn2.hangocthanh.io.vn}</code> trong Caddyfile: đọc env var <code>DOMAIN</code>, nếu không set thì dùng giá trị mặc định <code>vpn2.hangocthanh.io.vn</code>.</p>
+
+    <h2>Volumes</h2>
+    <pre><code>volumes:
+  - ./Caddyfile:/etc/caddy/Caddyfile:ro   # Caddyfile (read-only)
+  - gateway_data:/data                    # TLS certs, ACME state
+  - gateway_config:/config                # Caddy config (runtime)</code></pre>
+
+    <table>
+      <thead><tr><th>Volume</th><th>Mount</th><th>Mục đích</th></tr></thead>
+      <tbody>
+        <tr><td><code>./Caddyfile</code></td><td><code>/etc/caddy/Caddyfile:ro</code></td><td>Config file. Mount read-only để tránh Caddy tự ghi đè</td></tr>
+        <tr><td><code>gateway_data</code></td><td><code>/data</code></td><td>Let's Encrypt cert, ACME account, cert cache. Phải persist</td></tr>
+        <tr><td><code>gateway_config</code></td><td><code>/config</code></td><td>Caddy runtime config (JSON adapter cache, v.v.)</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Docker Compose snippet</h2>
+    <pre><code>gateway:
+  image: ghcr.io/vanbienperu3107/gateway:latest
+  restart: unless-stopped
+  ports:
+    - "80:80"
+    - "443:443"
+  environment:
+    DOMAIN: vpn2.hangocthanh.io.vn
+  volumes:
+    - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    - gateway_data:/data
+    - gateway_config:/config
+
+volumes:
+  gateway_data:
+  gateway_config:</code></pre>
+
+    <h2>Deployment trên vpn6</h2>
+    <p>vpn6 không dùng container gateway. Thay vào đó, vpn6 có <strong>Caddy hệ thống</strong> (cài trực tiếp trên host) đang phục vụ <code>claude.hangocthanh.io.vn</code> (memory-stack).</p>
+    <p>DERP relay trên vpn6 được tích hợp bằng cách thêm snippet <code>caddy-snippet.conf</code> vào Caddyfile của Caddy hệ thống. Snippet này thêm routing <code>/derp*</code> vào derp-relay container đang chạy trên vpn6.</p>
+    <div class="warn">Không deploy container <code>gateway</code> lên vpn6 — sẽ conflict với Caddy hệ thống trên port 80/443.</div>
+
+    <h2>Lưu ý quan trọng</h2>
+    <div class="warn">
+      <ul>
+        <li><strong>/derp* phải vào derp-relay, KHÔNG phải derp-controller.</strong> <code>derp-controller</code> (Headscale) đã tắt embedded DERP server. Nếu routing nhầm, client Tailscale sẽ fail khi cố kết nối DERP relay.</li>
+        <li><strong>replace-response plugin:</strong> Nếu không cần rewrite response content, plugin này không ảnh hưởng hiệu năng. <code>order replace after encode</code> đặt bước replace sau encode (gzip/br) để hoạt động đúng với nén.</li>
+        <li><strong>Log format JSON:</strong> <code>log { output stdout; format json }</code> giúp aggregate log dễ hơn (ELK, Loki, v.v.). Không log sang file để tránh disk full trong container.</li>
+        <li><strong>generate_204:</strong> Android và một số OS dùng URL này để kiểm tra internet connectivity. Trả <code>204</code> ngay tại Caddy thay vì forward đến backend.</li>
+        <li><strong>Fallback handle:</strong> <code>handle &#123; reverse_proxy derp-controller:8080 &#125;</code> ở cuối bắt mọi path không match — Headscale có thể có endpoint mới trong tương lai không cần update Caddyfile.</li>
+        <li><strong>Port 80 phải mở:</strong> Nếu firewall block port 80, ACME HTTP-01 challenge thất bại và Caddy không lấy được cert. Caddy sẽ retry liên tục nhưng không serve HTTPS được cho đến khi challenge thành công.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

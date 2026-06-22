@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exit-Node — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; word-break: break-all; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="derp-controller.html">DERP-Controller</a>
+    <a href="api-center.html">Api-Center</a>
+    <a href="admin-ui.html">Admin-UI</a>
+    <a href="derp-relay.html">DERP-Relay</a>
+    <a href="latency.html">Latency</a>
+    <a href="collector-sidecar.html">Collector-Sidecar</a>
+    <a href="gateway.html">Gateway</a>
+    <a href="exit-node.html" class="active">Exit-Node</a>
+    <a href="client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="../deploy/first-deploy.html">Lần đầu</a>
+    <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+    <a href="../deploy/secrets.html">Secrets</a>
+    <a href="../deploy/version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">&#8592; Trang chủ</a>
+  </nav>
+  <main>
+    <h1>Module: exit-node</h1>
+    <p class="subtitle">SOCKS5 + HTTP proxy node trong tailnet — gost v3 + Tailscale, standalone VPS</p>
+
+    <h2>Tổng quan</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">Image</div><div class="v">ghcr.io/vanbienperu3107/exit-node:latest</div></div>
+      <div class="meta-item"><div class="k">Source</div><div class="v">modules/exit-node/Dockerfile + entrypoint.sh</div></div>
+      <div class="meta-item"><div class="k">Stack</div><div class="v">gost v3 (build từ source) + tailscale/tailscale:latest</div></div>
+      <div class="meta-item"><div class="k">Port</div><div class="v">1080 (SOCKS5), 8118 (HTTP proxy)</div></div>
+      <div class="meta-item"><div class="k">Chạy trên</div><div class="v">Standalone VPS (không phải vpn2/vpn3/vpn4)</div></div>
+    </div>
+
+    <h2>Mục đích</h2>
+    <p>Module <code>exit-node</code> cung cấp <strong>proxy node</strong> trong tailnet: một VPS join tailnet với hostname tùy chọn và expose SOCKS5 + HTTP proxy. Client trong tailnet kết nối đến proxy node này để route traffic qua IP của VPS đó.</p>
+    <p>Trường hợp dùng điển hình:</p>
+    <ul>
+      <li>Cần IP của một country/region cụ thể để bypass geo-restriction.</li>
+      <li>Cần proxy có xác thực (username/password) trong môi trường tailnet private.</li>
+      <li>Tùy chọn: advertise exit node Tailscale để route toàn bộ traffic của node khác qua VPS này.</li>
+    </ul>
+
+    <h2>Lý do dùng gost v3</h2>
+    <p><strong>gost v2</strong> (github.com/ginuerzh/gost) hiện bị broken do dependency <code>obfs4</code> đã di chuyển từ GitHub sang GitLab và không còn tương thích. Build thất bại với các Alpine/Go mới.</p>
+    <p><strong>gost v3</strong> (github.com/go-gost/gost) là rewrite hoàn toàn, maintained, build sạch từ source với <code>CGO_ENABLED=0</code>. Cung cấp đầy đủ SOCKS5 và HTTP proxy với auth.</p>
+
+    <h2>Dockerfile</h2>
+    <pre><code># Stage 1: Build gost v3 tu source
+FROM golang:alpine AS builder
+RUN apk add --no-cache git
+WORKDIR /src
+RUN git clone --depth=1 https://github.com/go-gost/gost.git .
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /usr/local/bin/gost ./cmd/gost/
+
+FROM tailscale/tailscale:latest
+RUN apk add --no-cache iptables ip6tables
+COPY --from=builder /usr/local/bin/gost /usr/local/bin/gost
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]</code></pre>
+
+    <h3>Giải thích build</h3>
+    <ul>
+      <li><code>--depth=1</code>: shallow clone (không lấy full history) → build nhanh hơn.</li>
+      <li><code>CGO_ENABLED=0</code>: static binary, không cần libc trên runtime image.</li>
+      <li><code>-ldflags="-s -w"</code>: strip debug info → binary nhỏ hơn.</li>
+      <li><code>iptables</code> + <code>ip6tables</code>: Tailscale cần để quản lý routing rules (đặc biệt khi <code>ADVERTISE_EXIT_NODE=true</code>).</li>
+    </ul>
+
+    <h2>entrypoint.sh</h2>
+    <pre><code>#!/bin/sh
+set -e
+
+# Start tailscaled voi userspace networking
+tailscaled \
+  --state="${TS_STATE_DIR}/tailscaled.state" \
+  --socket="${TS_SOCKET}" \
+  --tun=userspace-networking &amp;
+TS_PID=$!
+
+sleep 3
+
+# Build tailscale up args
+TS_UP_ARGS="--authkey=${TS_AUTHKEY} --hostname=${EXIT_NODE_HOSTNAME}"
+
+if [ -n "${TS_LOGIN_SERVER}" ]; then
+  TS_UP_ARGS="${TS_UP_ARGS} --login-server=${TS_LOGIN_SERVER}"
+fi
+
+if [ "${ADVERTISE_EXIT_NODE}" = "true" ]; then
+  TS_UP_ARGS="${TS_UP_ARGS} --advertise-exit-node"
+fi
+
+tailscale up ${TS_UP_ARGS} --accept-routes
+
+# Build gost auth string
+if [ -n "${PROXY_USER}" ] &amp;&amp; [ -n "${PROXY_PASS}" ]; then
+  AUTH="${PROXY_USER}:${PROXY_PASS}@"
+else
+  AUTH=""
+fi
+
+# Start SOCKS5 proxy
+gost -L "socks5://${AUTH}:${SOCKS5_PORT}" &amp;
+
+# Start HTTP proxy
+gost -L "http://${AUTH}:${HTTP_PORT}" &amp;
+
+# Wait for tailscaled
+wait $TS_PID</code></pre>
+
+    <h3>Auth mode</h3>
+    <table>
+      <thead><tr><th><code>PROXY_USER</code></th><th><code>PROXY_PASS</code></th><th>Auth string</th><th>Behavior</th></tr></thead>
+      <tbody>
+        <tr><td>set</td><td>set</td><td><code>user:pass@</code></td><td>Yêu cầu xác thực</td></tr>
+        <tr><td>empty</td><td>empty</td><td><em>(empty)</em></td><td>No auth — bất kỳ ai trong tailnet đều dùng được</td></tr>
+      </tbody>
+    </table>
+    <div class="warn"><strong>Cảnh báo no-auth mode:</strong> Nếu không set auth và proxy port bị expose ra ngoài tailnet (firewall misconfiguration), proxy trở thành open proxy. Đảm bảo chỉ expose trong tailnet.</div>
+
+    <h2>Environment Variables</h2>
+    <table>
+      <thead><tr><th>Biến</th><th>Mặc định</th><th>Bắt buộc</th><th>Mô tả</th></tr></thead>
+      <tbody>
+        <tr><td><code>TS_AUTHKEY</code></td><td>—</td><td>Có</td><td>Pre-auth key để join tailnet</td></tr>
+        <tr><td><code>EXIT_NODE_HOSTNAME</code></td><td><code>proxy-node</code></td><td>Không</td><td>Hostname của node trong tailnet</td></tr>
+        <tr><td><code>TS_LOGIN_SERVER</code></td><td><code>https://vpn2.hangocthanh.io.vn</code></td><td>Không</td><td>Headscale control server URL</td></tr>
+        <tr><td><code>TS_STATE_DIR</code></td><td><code>/var/lib/tailscale</code></td><td>Không</td><td>Thư mục lưu state tailscaled</td></tr>
+        <tr><td><code>TS_SOCKET</code></td><td><code>/var/run/tailscale/tailscaled.sock</code></td><td>Không</td><td>Unix socket của tailscaled</td></tr>
+        <tr><td><code>PROXY_USER</code></td><td><em>(empty)</em></td><td>Không</td><td>Username xác thực proxy. Empty = no auth</td></tr>
+        <tr><td><code>PROXY_PASS</code></td><td><em>(empty)</em></td><td>Không</td><td>Password xác thực proxy</td></tr>
+        <tr><td><code>SOCKS5_PORT</code></td><td><code>1080</code></td><td>Không</td><td>Port SOCKS5 proxy</td></tr>
+        <tr><td><code>HTTP_PORT</code></td><td><code>8118</code></td><td>Không</td><td>Port HTTP proxy</td></tr>
+        <tr><td><code>ADVERTISE_EXIT_NODE</code></td><td><code>false</code></td><td>Không</td><td><code>true</code> = node advertise mình là Tailscale exit node</td></tr>
+      </tbody>
+    </table>
+
+    <h3>ADVERTISE_EXIT_NODE</h3>
+    <p>Khi <code>ADVERTISE_EXIT_NODE=true</code>:</p>
+    <ul>
+      <li>Node gửi <code>--advertise-exit-node</code> lên Headscale.</li>
+      <li>Headscale admin phải approve exit node (hoặc <code>latency</code> module auto-approve nếu policy cho phép).</li>
+      <li>Client Tailscale có thể chọn node này làm exit node để route toàn bộ traffic.</li>
+    </ul>
+    <div class="note">Khác với SOCKS5/HTTP proxy (explicit proxy, client phải cấu hình), exit node Tailscale là transparent (client chọn trong Tailscale app).</div>
+
+    <h2>Volumes</h2>
+    <pre><code>volumes:
+  - exit_node_state:/var/lib/tailscale   # Persist node identity</code></pre>
+    <p>Không cần volume bổ sung. Không có database hay cert riêng.</p>
+
+    <h2>Yêu cầu hệ thống</h2>
+    <pre><code># Khong can TUN device vi dung userspace-networking
+# Nhung neu muon kernel mode, can:
+# devices:
+#   - /dev/net/tun
+# cap_add:
+#   - NET_ADMIN</code></pre>
+    <div class="note"><code>--tun=userspace-networking</code> trong entrypoint.sh cho phép chạy mà không cần <code>/dev/net/tun</code> hay <code>NET_ADMIN</code>. Hiệu năng thấp hơn kernel mode nhưng không cần đặc quyền.<br><br>Nếu cần hiệu năng cao (kernel mode): bỏ <code>--tun=userspace-networking</code>, thêm <code>devices: /dev/net/tun</code> và <code>cap_add: NET_ADMIN</code>.</div>
+
+    <h2>Deploy</h2>
+    <p>File deploy nằm tại: <code>deploy/exit-node/</code></p>
+    <pre><code>deploy/exit-node/
+├── docker-compose.yml
+└── .env.example</code></pre>
+
+    <h3>docker-compose.yml</h3>
+    <pre><code>version: "3.8"
+services:
+  exit-node:
+    image: ghcr.io/vanbienperu3107/exit-node:latest
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      EXIT_NODE_HOSTNAME: ${EXIT_NODE_HOSTNAME:-proxy-node}
+      TS_LOGIN_SERVER: ${TS_LOGIN_SERVER:-https://vpn2.hangocthanh.io.vn}
+      PROXY_USER: ${PROXY_USER:-}
+      PROXY_PASS: ${PROXY_PASS:-}
+      SOCKS5_PORT: ${SOCKS5_PORT:-1080}
+      HTTP_PORT: ${HTTP_PORT:-8118}
+      ADVERTISE_EXIT_NODE: ${ADVERTISE_EXIT_NODE:-false}
+    volumes:
+      - exit_node_state:/var/lib/tailscale
+    ports:
+      # Chi expose neu can access tu ngoai tailnet
+      # Neu chi dung trong tailnet: comment out ports
+      # - "1080:1080"
+      # - "8118:8118"
+
+volumes:
+  exit_node_state:</code></pre>
+
+    <h3>.env.example</h3>
+    <pre><code>TS_AUTHKEY=tskey-auth-xxxxxxxxxxxx
+EXIT_NODE_HOSTNAME=proxy-vn
+TS_LOGIN_SERVER=https://vpn2.hangocthanh.io.vn
+PROXY_USER=
+PROXY_PASS=
+SOCKS5_PORT=1080
+HTTP_PORT=8118
+ADVERTISE_EXIT_NODE=false</code></pre>
+
+    <h2>Cách dùng từ client</h2>
+
+    <h3>SOCKS5 proxy</h3>
+    <pre><code># curl qua SOCKS5 (no auth)
+curl --socks5 proxy-node:1080 https://ifconfig.me
+
+# curl qua SOCKS5 (co auth)
+curl --socks5 user:pass@proxy-node:1080 https://ifconfig.me</code></pre>
+
+    <h3>HTTP proxy</h3>
+    <pre><code># curl qua HTTP proxy (no auth)
+http_proxy=http://proxy-node:8118 curl https://ifconfig.me
+
+# curl qua HTTP proxy (co auth)
+http_proxy=http://user:pass@proxy-node:8118 curl https://ifconfig.me</code></pre>
+
+    <h3>Browser</h3>
+    <p>Cấu hình browser (hoặc system proxy) trỏ đến <code>proxy-node:1080</code> (SOCKS5) hoặc <code>proxy-node:8118</code> (HTTP).</p>
+
+    <h2>Lưu ý quan trọng</h2>
+    <div class="warn">
+      <ul>
+        <li><strong>Standalone VPS:</strong> Module này thiết kế cho VPS riêng biệt, không chạy cùng vpn2/vpn3/vpn4 để không xung đột với stack chính. Mỗi exit-node là một deployment độc lập.</li>
+        <li><strong>userspace-networking:</strong> Dùng <code>--tun=userspace-networking</code> nghĩa là Tailscale route qua user-space TCP/IP stack. Latency cao hơn kernel mode khoảng 10-20%. Acceptable cho proxy use case.</li>
+        <li><strong>Port forward:</strong> Nếu VPS có firewall, cần mở port <code>1080</code> và <code>8118</code> (hoặc để mặc định chỉ accessible trong tailnet và không mở ra ngoài).</li>
+        <li><strong>gost v3 listener address:</strong> <code>gost -L "socks5://:1080"</code> lắng nghe trên <code>0.0.0.0:1080</code>. Tailscale IP của node sẽ là địa chỉ dùng được trong tailnet. Firewall host nên block các port này nếu không muốn expose ra internet.</li>
+        <li><strong>Multiple exit nodes:</strong> Có thể deploy nhiều instance với <code>EXIT_NODE_HOSTNAME</code> khác nhau (ví dụ: <code>proxy-sg</code>, <code>proxy-jp</code>, <code>proxy-us</code>) để client chọn theo nhu cầu geo.</li>
+        <li><strong>gost v3 vs v2:</strong> gost v3 có breaking changes về CLI flags so với v2. Config file format cũng khác. Không dùng config format của gost v2 cho binary v3.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client-Mod (Windows) — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; word-break: break-all; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="derp-controller.html">DERP-Controller</a>
+    <a href="api-center.html">Api-Center</a>
+    <a href="admin-ui.html">Admin-UI</a>
+    <a href="derp-relay.html">DERP-Relay</a>
+    <a href="latency.html">Latency</a>
+    <a href="collector-sidecar.html">Collector-Sidecar</a>
+    <a href="gateway.html">Gateway</a>
+    <a href="exit-node.html">Exit-Node</a>
+    <a href="client-mod.html" class="active">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="../deploy/first-deploy.html">Lần đầu</a>
+    <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+    <a href="../deploy/secrets.html">Secrets</a>
+    <a href="../deploy/version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">&#8592; Trang chủ</a>
+  </nav>
+  <main>
+    <h1>Module: client-mod (External repo)</h1>
+    <p class="subtitle">Fork Tailscale Windows v1.98.4 với background reporter goroutine — vanbienperu3107/tailscale_mod</p>
+
+    <h2>Tổng quan</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">Loại</div><div class="v">External repository — không có Docker image</div></div>
+      <div class="meta-item"><div class="k">Source repo</div><div class="v">vanbienperu3107/tailscale_mod</div></div>
+      <div class="meta-item"><div class="k">URL</div><div class="v"><a href="https://github.com/vanbienperu3107/tailscale_mod" target="_blank">github.com/vanbienperu3107/tailscale_mod</a></div></div>
+      <div class="meta-item"><div class="k">Base</div><div class="v">Tailscale v1.98.4 (official fork)</div></div>
+      <div class="meta-item"><div class="k">Chạy trên</div><div class="v">Windows endpoints (máy khách)</div></div>
+      <div class="meta-item"><div class="k">CI trong TailscaleRemote</div><div class="v">Không — build thủ công hoặc CI trong repo riêng</div></div>
+    </div>
+
+    <div class="warn"><strong>Lưu ý:</strong> Đây là external repository. Không có thư mục <code>modules/client-mod/</code> trong repo <code>TailscaleRemote</code>. Tài liệu này mô tả integration và behavior của fork, không phải source trong monorepo.</div>
+
+    <h2>Mục đích</h2>
+    <p><code>tailscale_mod</code> là fork của Tailscale Windows client (v1.98.4) được patch thêm một background goroutine để <strong>báo cáo metrics về collector</strong> (latency module trên vpn2). Mục tiêu:</p>
+    <ul>
+      <li>Ghi nhận MAC address của card mạng chính (để định danh thiết bị).</li>
+      <li>Đo RTT từ Windows client đến tất cả peer online trong tailnet.</li>
+      <li>POST dữ liệu lên collector để hiển thị trong dashboard và phân tích latency end-to-end.</li>
+    </ul>
+    <div class="note">Không thay đổi hành vi Tailscale cốt lõi (routing, DERP, auth). Chỉ thêm background reporting.</div>
+
+    <h2>Kiến trúc</h2>
+    <pre><code>Windows endpoint
++----------------------------------------------------------+
+|                    tailscale_mod                         |
+|                                                          |
+|  +-------------------------+  +----------------------+  |
+|  |   Tailscale core        |  |  Reporter goroutine  |  |
+|  |   (khong thay doi)      |  |  (them vao v1.98.4)  |  |
+|  |                         |  |                      |  |
+|  |  LocalAPI unix socket   |&lt;-|  GET /status         |  |
+|  |  /var/run/tailscale/    |  |  POST /ping          |  |
+|  |  tailscaled.sock        |  |                      |  |
+|  |                         |  |  doc MAC (WMI)       |  |
+|  +-------------------------+  +----------+-----------+  |
+|                                           | moi 30s      |
++-------------------------------------------+--------------+
+                                            |
+                                            v POST qua tailnet
+                                  collector:8090/metrics/report
+                                  (latency module tren vpn2)</code></pre>
+
+    <h2>Các thay đổi so với tailscale v1.98.4</h2>
+
+    <h3>1. Background goroutine reporter</h3>
+    <p>Một goroutine mới được thêm vào Tailscale daemon, chạy định kỳ mỗi <strong>30 giây</strong>:</p>
+    <pre><code>// Pseudo-code -- logic them vao
+func startReporter(ctx context.Context, lc *local.Client) {
+    ticker := time.NewTicker(30 * time.Second)
+    defer ticker.Stop()
+    for {
+        select {
+        case &lt;-ticker.C:
+            report(ctx, lc)
+        case &lt;-ctx.Done():
+            return
+        }
+    }
+}</code></pre>
+
+    <h3>2. Đọc MAC address</h3>
+    <p>Dùng <strong>WMI</strong> (Windows Management Instrumentation) hoặc <code>GetAdaptersInfo</code> (Win32 API) để lấy MAC address của card mạng chính (card có default route):</p>
+    <pre><code>// Uu tien WMI query:
+// SELECT MACAddress FROM Win32_NetworkAdapterConfiguration WHERE IPEnabled=TRUE
+// Fallback: GetAdaptersInfo() tu iphlpapi.dll</code></pre>
+    <p>MAC address dùng để định danh thiết bị bền vững hơn hostname (hostname có thể thay đổi).</p>
+
+    <h3>3. Lấy danh sách peer qua LocalAPI</h3>
+    <pre><code>GET /localapi/v0/status</code></pre>
+    <p>Response chứa danh sách tất cả peer trong tailnet kèm trạng thái online/offline, Tailscale IP, hostname. Goroutine lọc lấy peer đang <strong>online</strong>.</p>
+
+    <h3>4. Ping từng peer</h3>
+    <pre><code>POST /localapi/v0/ping?ip=&lt;tailnet-ip&gt;&amp;type=disco</code></pre>
+    <p>Thực hiện disco ping đến từng peer online, lấy RTT (ms). Timeout mỗi ping là hợp lý (không block quá lâu nếu peer không trả lời).</p>
+
+    <h3>5. POST kết quả lên collector</h3>
+    <pre><code>POST http://collector:8090/metrics/report
+Content-Type: application/json
+
+{
+  "hostname": "itop-thanhhn",
+  "mac": "AA:BB:CC:DD:EE:FF",
+  "ipv4": "100.64.x.x",
+  "samples": [
+    {
+      "dst": "vpn3",
+      "dst_ip": "100.64.y.y",
+      "rtt_ms": 15.2,
+      "path": "derp-vpn3-vn",
+      "ok": true
+    },
+    {
+      "dst": "vpn4",
+      "dst_ip": "100.64.z.z",
+      "rtt_ms": 28.7,
+      "path": "direct",
+      "ok": true
+    }
+  ]
+}</code></pre>
+    <p><code>collector</code> được resolve qua Tailscale DNS (hostname của <code>collector-sidecar</code> node trong tailnet).</p>
+
+    <h2>Payload structure</h2>
+    <h3>POST /metrics/report</h3>
+    <table>
+      <thead><tr><th>Field</th><th>Type</th><th>Mô tả</th></tr></thead>
+      <tbody>
+        <tr><td><code>hostname</code></td><td>string</td><td>Hostname Windows endpoint</td></tr>
+        <tr><td><code>mac</code></td><td>string</td><td>MAC address card mạng chính (format <code>AA:BB:CC:DD:EE:FF</code>)</td></tr>
+        <tr><td><code>ipv4</code></td><td>string</td><td>Tailnet IPv4 của endpoint</td></tr>
+        <tr><td><code>samples</code></td><td>array</td><td>Mảng kết quả ping đến từng peer</td></tr>
+        <tr><td><code>samples[].dst</code></td><td>string</td><td>Hostname đích</td></tr>
+        <tr><td><code>samples[].dst_ip</code></td><td>string</td><td>Tailnet IP đích</td></tr>
+        <tr><td><code>samples[].rtt_ms</code></td><td>float</td><td>RTT ms</td></tr>
+        <tr><td><code>samples[].path</code></td><td>string</td><td><code>"direct"</code> hoặc <code>"derp-&lt;region&gt;"</code></td></tr>
+        <tr><td><code>samples[].ok</code></td><td>bool</td><td>Ping thành công hay timeout</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Build</h2>
+
+    <h3>Yêu cầu</h3>
+    <ul>
+      <li>Go 1.22+ (khuyến nghị dùng cùng version với Tailscale v1.98.4)</li>
+      <li>Windows SDK (cho WMI và Win32 API bindings)</li>
+      <li>Git</li>
+    </ul>
+
+    <h3>Build thủ công</h3>
+    <pre><code>git clone https://github.com/vanbienperu3107/tailscale_mod.git
+cd tailscale_mod
+go build -o tailscale.exe ./cmd/tailscale/
+go build -o tailscaled.exe ./cmd/tailscaled/</code></pre>
+
+    <h3>CI</h3>
+    <p>Không có CI trong repo <code>TailscaleRemote</code>. CI nằm trong repo <code>vanbienperu3107/tailscale_mod</code> (nếu đã cấu hình). Build thủ công trên máy Windows hoặc dùng GitHub Actions trong repo gốc.</p>
+    <div class="warn"><strong>Quy tắc:</strong> Không deploy build lên máy thật cho đến khi CI trong repo <code>tailscale_mod</code> pass.</div>
+
+    <h2>Cài đặt trên Windows endpoint</h2>
+    <ol>
+      <li>Gỡ cài đặt Tailscale official (nếu đã cài).</li>
+      <li>Stop service <code>Tailscale</code> nếu đang chạy.</li>
+      <li>Replace binary <code>tailscale.exe</code> và <code>tailscaled.exe</code> trong thư mục cài đặt.</li>
+      <li>Start lại service hoặc re-install.</li>
+      <li>Join tailnet như bình thường (<code>tailscale up --login-server=...</code>).</li>
+    </ol>
+    <div class="note">Reporter goroutine tự động start khi <code>tailscaled</code> khởi động. Không cần cấu hình thêm.</div>
+
+    <h2>Collector endpoint</h2>
+    <p>Reporter gửi về <code>http://collector:8090/metrics/report</code> — <code>collector</code> là Tailscale hostname của <code>collector-sidecar</code> node trên vpn2.</p>
+    <p>Resolve flow:</p>
+    <pre><code>collector:8090
+    | Tailscale MagicDNS
+    v
+100.64.x.x:8090  (Tailnet IP cua collector-sidecar)
+    | socat trong collector-sidecar
+    v
+latency:8090  (Docker network tren vpn2)</code></pre>
+    <div class="note">Nếu <code>collector-sidecar</code> offline, report thất bại silently (goroutine log error và tiếp tục đến lần tiếp theo sau 30s). Không ảnh hưởng hoạt động Tailscale cốt lõi.</div>
+
+    <h2>Lưu ý quan trọng</h2>
+    <div class="warn">
+      <ul>
+        <li><strong>Không thay đổi Tailscale core:</strong> Mọi patch chỉ thêm goroutine phụ. Hoạt động routing, DERP, auth, DNS không bị ảnh hưởng. Nếu reporter crash, panic được recover để không làm crash toàn bộ daemon.</li>
+        <li><strong>MAC address stability:</strong> MAC là primary key để dedup node trong <code>latency</code> module. Đổi card mạng hoặc virtual MAC (VM snapshot) sẽ tạo record mới. Hostname vẫn dùng làm secondary identifier.</li>
+        <li><strong>Tailnet-only transport:</strong> Reporter chỉ gửi qua tailnet (<code>collector</code> hostname). Không gửi ra internet, không có hardcoded IP. Nếu node chưa join tailnet, report không thực hiện.</li>
+        <li><strong>30s interval:</strong> Interval này đồng bộ với <code>POLL_INTERVAL=30</code> của relay reporters (vpn3/4). Dashboard hiển thị data đồng nhất từ tất cả nguồn.</li>
+        <li><strong>Rebase policy:</strong> Khi Tailscale upstream release version mới, cần rebase patch lên version đó. Fork ở v1.98.4 — theo dõi upstream để rebase kịp thời, đặc biệt nếu có security fix.</li>
+        <li><strong>WMI dependency:</strong> WMI có thể bị disable hoặc bị chặn trong một số môi trường enterprise. Fallback <code>GetAdaptersInfo</code> sẽ được dùng; nếu cả hai đều fail, <code>mac</code> field sẽ là empty string và record vẫn được gửi (dedup dùng hostname làm fallback key).</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kiến trúc Tổng quan — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .step { display: flex; gap: 16px; margin-bottom: 20px; }
+    .step-num { background: #1e3a5f; color: #38bdf8; font-weight: 700; font-size: 14px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .step-body { flex: 1; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="../modules/derp-controller.html">DERP-Controller</a>
+    <a href="../modules/api-center.html">Api-Center</a>
+    <a href="../modules/admin-ui.html">Admin-UI</a>
+    <a href="../modules/derp-relay.html">DERP-Relay</a>
+    <a href="../modules/latency.html">Latency</a>
+    <a href="../modules/collector-sidecar.html">Collector-Sidecar</a>
+    <a href="../modules/gateway.html">Gateway</a>
+    <a href="../modules/exit-node.html">Exit-Node</a>
+    <a href="../modules/client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="overview.html" class="active">Tổng quan</a>
+    <a href="ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="../deploy/first-deploy.html">Lần đầu</a>
+    <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+    <a href="../deploy/secrets.html">Secrets</a>
+    <a href="../deploy/version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">← Trang chủ</a>
+  </nav>
+
+  <main>
+    <h1>Tổng quan kiến trúc hệ thống TailscaleRemote</h1>
+    <p class="subtitle">last_verified_at: 2026-06-21 &nbsp;·&nbsp; verified_by: lead-orchestrator &nbsp;·&nbsp; status: active &nbsp;·&nbsp; next_review_due: 2026-09-21</p>
+
+    <h2>1. Giới thiệu</h2>
+    <p><strong>TailscaleRemote</strong> là hệ thống tự vận hành (self-hosted) Tailscale + Headscale, bao gồm control plane, DERP relay, dashboard admin, đo độ trễ mạng, và client mod cho Windows. Hệ thống được thiết kế theo hướng <strong>High Availability (HA)</strong> trên hai node chính (vpn2 + vpn6) với Cloudflare Load Balancer ở tầng DNS.</p>
+
+    <hr>
+
+    <h2>2. Danh sách 9 modules</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Module</th>
+          <th>Nguồn</th>
+          <th>Mô tả</th>
+          <th>Vị trí deploy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td><code>derp-controller</code></td>
+          <td>External: <code>vanbienperu3107/headscale</code> fork</td>
+          <td>Headscale control plane — xác thực client, phân phối DERPMap, quản lý tailnet</td>
+          <td>vpn2 + vpn6 (HA)</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td><code>api-center</code></td>
+          <td><code>modules/api-center</code></td>
+          <td>Fastify API hub — REST API cho admin-ui, Google OAuth, quản lý DERP node DB, proxy tới headscale</td>
+          <td>vpn2 + vpn6 (HA)</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td><code>admin-ui</code></td>
+          <td><code>modules/admin-ui</code></td>
+          <td>React dashboard — giao diện quản lý DERP regions, nodes, latency, user</td>
+          <td>vpn2 + vpn6 (HA)</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td><code>derp-relay</code></td>
+          <td><code>modules/derp-relay</code></td>
+          <td>DERP relay WebSocket + STUN + ping-reporter gửi latency về collector</td>
+          <td>vpn2, vpn3, vpn4, vpn6</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td><code>latency</code></td>
+          <td><code>modules/latency</code></td>
+          <td>node-dedup + latency collector server + metrics SQLite DB</td>
+          <td>vpn2 only</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td><code>collector-sidecar</code></td>
+          <td><code>modules/collector-sidecar</code></td>
+          <td>Tailscale daemon + socat bridge — join tailnet để ping-reporter trên relay node khác kết nối được</td>
+          <td>vpn2 only (cùng host latency)</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td><code>gateway</code></td>
+          <td><code>modules/gateway</code></td>
+          <td>Caddy reverse proxy — TLS termination, routing tới tất cả service</td>
+          <td>vpn2 only</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td><code>exit-node</code></td>
+          <td><code>modules/exit-node</code></td>
+          <td>gost SOCKS5/HTTP proxy standalone — join tailnet rồi cung cấp exit proxy</td>
+          <td>Bất kỳ VPS</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td><code>client-mod</code></td>
+          <td>External: <code>vanbienperu3107/tailscale_mod</code></td>
+          <td>Windows Tailscale client patch — kết nối về headscale thay vì Tailscale.com</td>
+          <td>Windows client</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>3. Topology mạng</h2>
+    <pre><code>Internet
+    │
+    ▼
+Cloudflare DNS Load Balancer
+  hostname: vpn2.hangocthanh.io.vn
+  pool:     165.22.12.169 (vpn2) + 45.119.87.220 (vpn6)
+  health:   HTTPS GET /healthz → "ok"
+  failover: automatic round-robin
+    │
+    ├──────────────────────────────────────────────────────┐
+    ▼                                                      ▼
+vpn2 (PRIMARY)                                    vpn6 (HA REPLICA)
+165.22.12.169                                     45.119.87.220
+Ubuntu 22.04                                      Ubuntu 22.04
+    │                                                      │
+    ▼                                                      ▼
+Gateway (Caddy)                               Caddy (system install + snippet)
+  TLS termination                               TLS termination
+  Port 80/443                                   Port 80/443
+    │                                                      │
+    ├─ derp-controller (headscale)             ├─ derp-controller
+    ├─ api-center (Fastify)                    ├─ api-center
+    ├─ admin-ui (React static)                 ├─ admin-ui
+    ├─ derp-relay (vpn2 local relay)           └─ derp-relay (vpn6 relay)
+    ├─ latency (node-dedup + metrics)
+    └─ collector-sidecar (Tailscale + socat)
+
+
+vpn3 (64.176.23.196) — Standalone DERP Relay
+  domain: vpn3.hangocthanh.io.vn
+  └─ derp-relay container (DERP WebSocket + STUN)
+     └─ ping-reporter → tailnet → collector:8090 (vpn2)
+
+vpn4 — Standalone DERP Relay (tương tự vpn3)
+
+exit-node — Bất kỳ VPS
+  └─ gost container
+     └─ join tailnet + SOCKS5:1080 + HTTP:8080</code></pre>
+
+    <hr>
+
+    <h2>4. Data flows (luồng dữ liệu)</h2>
+
+    <h3>4.1 Tailscale client — DERP relay</h3>
+    <pre><code>Tailscale client (Windows client-mod)
+    → DNS → Cloudflare LB → vpn2/vpn6 :443
+    → Caddy → /derp* → derp-relay
+    → WebSocket DERP tunnel</code></pre>
+    <p>Mục đích: relay traffic giữa các client khi không kết nối P2P trực tiếp được.</p>
+
+    <h3>4.2 Tailscale client — Control plane</h3>
+    <pre><code>Tailscale client (Windows client-mod)
+    → DNS → Cloudflare LB → vpn2/vpn6 :443
+    → Caddy → /key, /ts2021, /api/v1/*
+    → derp-controller (headscale)
+    → xác thực, phát DERPMap, quản lý peer list</code></pre>
+
+    <h3>4.3 Admin browser — Dashboard</h3>
+    <pre><code>Admin browser
+    → DNS → Cloudflare LB → :443
+    → Caddy → /app/* → admin-ui (static bundle)
+    → Caddy → /app/api/* → api-center (Fastify)
+        → api-center → headscale REST API (gRPC gateway)
+        → api-center → Neon Postgres (DERP node DB)</code></pre>
+
+    <h3>4.4 Latency reporting từ relay node ngoài</h3>
+    <pre><code>derp-relay container (vpn3/vpn4)
+    └─ ping-reporter.py
+        → tailnet (qua Tailscale IP)
+        → collector-sidecar:8090 trên vpn2
+        → socat bridge
+        → latency service :8090
+        → ghi vào SQLite /data/devices.db</code></pre>
+
+    <h3>4.5 Latency ping từ server (vpn2 → peers)</h3>
+    <pre><code>latency service (vpn2)
+    → unix socket ts_sock (shared volume)
+    → Tailscale LocalAPI
+    → ping tới mọi peer trong tailnet
+    → ghi kết quả vào SQLite</code></pre>
+
+    <h3>4.6 Windows client-mod — Latency</h3>
+    <pre><code>client-mod (Windows)
+    → kết nối tailnet
+    → collector:8090 trên vpn2 (qua tailnet IP)
+    → latency DB update</code></pre>
+
+    <h3>4.7 Dynamic DERPMap — Pull định kỳ</h3>
+    <pre><code>derp-controller (headscale) — mỗi 10 giây
+    → GET https://vpn2.hangocthanh.io.vn/app/api/derp-map
+    → api-center → Neon Postgres (DERP node table)
+    → trả về derpmap.json
+    → headscale cache + phân phối cho client</code></pre>
+
+    <h3>4.8 Feature B — Per-node DERPMap</h3>
+    <pre><code>Tailscale client (nodeKey cụ thể)
+    → derp-controller (headscale fork)
+    → GET /api/internal/derp-map/:nodeKey
+    → api-center → filtered DERPMap theo rules/priority
+    → headscale trả DERPMap riêng cho từng node</code></pre>
+
+    <hr>
+
+    <h2>5. Docker volumes (vpn2)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Volume</th>
+          <th>Mount trong container</th>
+          <th>Mục đích</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>derp_relay_certs</code></td>
+          <td><code>/certs</code> (derp-relay)</td>
+          <td>TLS certificates cho DERP relay</td>
+        </tr>
+        <tr>
+          <td><code>latency_data</code></td>
+          <td><code>/data</code> (latency)</td>
+          <td>SQLite database <code>/data/devices.db</code></td>
+        </tr>
+        <tr>
+          <td><code>collector_state</code></td>
+          <td><code>/var/lib/tailscale</code> (collector-sidecar)</td>
+          <td>Tailscale daemon state</td>
+        </tr>
+        <tr>
+          <td><code>ts_sock</code></td>
+          <td><code>/ts_sock</code> (latency + collector-sidecar)</td>
+          <td>Unix socket chia sẻ LocalAPI</td>
+        </tr>
+        <tr>
+          <td><code>derp_controller_run</code></td>
+          <td><code>/var/run/headscale</code> (derp-controller)</td>
+          <td>Headscale runtime files, socket</td>
+        </tr>
+        <tr>
+          <td><code>gateway_data</code></td>
+          <td><code>/data</code> (gateway/Caddy)</td>
+          <td>Caddy TLS certs tự động (ACME)</td>
+        </tr>
+        <tr>
+          <td><code>gateway_config</code></td>
+          <td><code>/config</code> (gateway/Caddy)</td>
+          <td>Caddyfile config</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>6. Ports exposed</h2>
+
+    <h3>vpn2</h3>
+    <table>
+      <thead>
+        <tr><th>Port</th><th>Protocol</th><th>Service</th><th>Mục đích</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>80</td><td>TCP</td><td>gateway (Caddy)</td><td>HTTP → redirect HTTPS</td></tr>
+        <tr><td>443</td><td>TCP</td><td>gateway (Caddy)</td><td>HTTPS — tất cả traffic</td></tr>
+        <tr><td>3478</td><td>UDP</td><td>derp-controller</td><td>STUN control plane</td></tr>
+        <tr><td>3479</td><td>UDP</td><td>derp-relay</td><td>STUN relay (vpn2 local relay)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>vpn3 / vpn4 (standalone relay)</h3>
+    <table>
+      <thead>
+        <tr><th>Port</th><th>Protocol</th><th>Service</th><th>Mục đích</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>443</td><td>TCP</td><td>Nginx/Caddy host</td><td>DERP WebSocket (TLS termination)</td></tr>
+        <tr><td>3478</td><td>UDP</td><td>derp-relay</td><td>STUN</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>7. High Availability design</h2>
+
+    <h3>7.1 derp-controller (headscale)</h3>
+    <ul>
+      <li><strong>Database</strong>: Neon Postgres (shared cloud DB) — cả vpn2 và vpn6 kết nối cùng endpoint</li>
+      <li><strong>noise_private.key</strong>: deploy cùng một key (từ secret <code>HEADSCALE_NOISE_KEY</code>) lên cả hai node → client không phân biệt được đang kết nối node nào</li>
+      <li><strong>Stateless</strong>: mỗi request độc lập, không cần session affinity</li>
+      <li><strong>Failover</strong>: Cloudflare LB tự chuyển traffic khi một node fail health check</li>
+    </ul>
+
+    <h3>7.2 api-center</h3>
+    <ul>
+      <li><strong>Database</strong>: Neon Postgres — sessions và DERP node data đều trên cloud DB</li>
+      <li><strong>SESSION_SECRET</strong>: cùng một secret → JWT/session valid trên cả hai node</li>
+      <li><strong>Stateless</strong>: không có local state</li>
+    </ul>
+
+    <h3>7.3 admin-ui</h3>
+    <ul>
+      <li><strong>Pure static</strong>: React bundle, zero state, zero session</li>
+      <li>Deploy giống nhau lên cả hai node</li>
+    </ul>
+
+    <h3>7.4 latency + collector-sidecar</h3>
+    <ul>
+      <li><strong>Single instance trên vpn2</strong>: không cần HA</li>
+      <li>Nếu vpn2 down, latency data tạm dừng nhưng không ảnh hưởng Tailscale traffic</li>
+      <li>SQLite local — acceptable for monitoring workload</li>
+    </ul>
+
+    <h3>7.5 Cloudflare Load Balancer</h3>
+    <pre><code>Pool: vpn2 (primary) + vpn6 (secondary)
+Health check: HTTPS GET /healthz
+  → Expect HTTP 200, body "ok"
+  → Interval: 30s, threshold: 2 failures
+Failover: automatic, DNS TTL 30s</code></pre>
+
+    <hr>
+
+    <h2>8. CI/CD flow</h2>
+    <pre><code>Developer push → GitHub (branch/PR)
+    │
+    ▼
+.github/workflows/module-&lt;name&gt;.yml
+    ├─ Run tests (unit/integration)
+    ├─ Build Docker image
+    │    └─ ghcr.io/vanbienperu3107/&lt;module&gt;:latest
+    │    └─ ghcr.io/vanbienperu3107/&lt;module&gt;:&lt;sha&gt;
+    └─ Push to GHCR
+
+    (merge to main)
+    │
+    ▼
+deploy-control-plane.yml
+    ├─ Rolling deploy vpn2
+    │    ├─ SSH → docker compose pull
+    │    ├─ docker compose up -d
+    │    └─ Health check /healthz (wait up to 60s)
+    └─ Rolling deploy vpn6 (chỉ sau vpn2 healthy)
+         ├─ SSH → docker compose pull
+         ├─ docker compose up -d
+         └─ Health check /healthz</code></pre>
+
+    <p>Workflow modules riêng:</p>
+    <table>
+      <thead>
+        <tr><th>Workflow</th><th>Trigger</th><th>Deploy target</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>module-derp-controller.yml</code></td><td>push <code>modules/derp-controller/**</code></td><td>build + push GHCR</td></tr>
+        <tr><td><code>module-api-center.yml</code></td><td>push <code>modules/api-center/**</code></td><td>build + push GHCR</td></tr>
+        <tr><td><code>module-admin-ui.yml</code></td><td>push <code>modules/admin-ui/**</code></td><td>build + push GHCR</td></tr>
+        <tr><td><code>module-derp-relay.yml</code></td><td>push <code>modules/derp-relay/**</code></td><td>build + push + deploy vpn3</td></tr>
+        <tr><td><code>module-latency.yml</code></td><td>push <code>modules/latency/**</code></td><td>build + push GHCR</td></tr>
+        <tr><td><code>module-collector-sidecar.yml</code></td><td>push <code>modules/collector-sidecar/**</code></td><td>build + push GHCR</td></tr>
+        <tr><td><code>module-gateway.yml</code></td><td>push <code>modules/gateway/**</code></td><td>build + push GHCR</td></tr>
+        <tr><td><code>deploy-control-plane.yml</code></td><td>manual dispatch hoặc push <code>deploy/</code></td><td>rolling deploy vpn2 → vpn6</td></tr>
+        <tr><td><code>check-versions.yml</code></td><td>manual / schedule</td><td>so sánh running vs GHCR latest</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>9. Phân tầng bảo mật (trust boundaries)</h2>
+    <pre><code>[Public Internet]
+    │  HTTPS 443 only (TLS 1.2+)
+    ▼
+[Cloudflare — WAF + DDoS]
+    │
+    ▼
+[Caddy — TLS termination, rate limit]
+    │
+    ├──[/app/api/*]── api-center  ──[Google OAuth]── Admin only
+    ├──[/derp*]────── derp-relay  ──[Tailscale auth]
+    ├──[/key /ts2021] derp-controller ──[noise protocol]
+    └──[/app/*]────── admin-ui (static, no auth at CDN level)
+
+[Internal Docker network — isolated]
+    derp-controller ↔ api-center (localhost/docker-net)
+    latency ↔ collector-sidecar (unix socket)
+
+[Tailnet — encrypted overlay]
+    collector-sidecar ↔ ping-reporter (vpn3/4)
+    client-mod ↔ collector
+    exit-node ↔ peers</code></pre>
+
+    <hr>
+
+    <h2>10. Sơ đồ tóm tắt các external dependencies</h2>
+    <table>
+      <thead>
+        <tr><th>Dependency</th><th>Loại</th><th>Dùng bởi</th><th>Ghi chú</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Neon Postgres</td><td>Cloud DB</td><td>api-center, derp-controller</td><td>HA tự động, serverless</td></tr>
+        <tr><td>Cloudflare</td><td>DNS LB + WAF</td><td>gateway (ingress)</td><td>Free tier đủ dùng</td></tr>
+        <tr><td>GHCR</td><td>Container registry</td><td>Tất cả modules</td><td>Miễn phí với public repo</td></tr>
+        <tr><td>Google OAuth</td><td>Auth provider</td><td>api-center</td><td>Chỉ admin login</td></tr>
+        <tr><td>GitHub Actions</td><td>CI/CD</td><td>Tất cả</td><td>Free tier</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>11. Ghi chú kiến trúc</h2>
+    <ul>
+      <li><strong>vpn6 co-host</strong>: vpn6 (45.119.87.220) chạy chung box với <code>memory-stack</code> / <code>claude.hangocthanh.io.vn</code>. Caddy trên vpn6 là system install, TailscaleRemote dùng snippet include — không conflict.</li>
+      <li><strong>vpn3 DERP</strong>: vpn3 (64.176.23.196 / <code>vpn3.hangocthanh.io.vn</code>, Ubuntu 24.04, server mới 2026-06-19) chạy thuần DERP relay, không chạy control plane.</li>
+      <li><strong>headscale fork</strong>: <code>vanbienperu3107/headscale</code> — fork của headscale upstream, bổ sung Feature B (per-node DERPMap API). Không thay đổi noise protocol.</li>
+      <li><strong>client-mod</strong>: <code>vanbienperu3107/tailscale_mod</code> — fork Tailscale v1.98.4 cho Windows, patch server URL về <code>vpn2.hangocthanh.io.vn</code>.</li>
+      <li><strong>exit-node</strong>: Không có trong HA topology — standalone, bất kỳ VPS nào join tailnet.</li>
+    </ul>
+  </main>
+</body>
+</html>

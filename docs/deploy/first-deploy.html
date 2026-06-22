@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deploy Lần Đầu — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .step { display: flex; gap: 16px; margin-bottom: 20px; }
+    .step-num { background: #1e3a5f; color: #38bdf8; font-weight: 700; font-size: 14px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .step-body { flex: 1; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="../modules/derp-controller.html">DERP-Controller</a>
+    <a href="../modules/api-center.html">Api-Center</a>
+    <a href="../modules/admin-ui.html">Admin-UI</a>
+    <a href="../modules/derp-relay.html">DERP-Relay</a>
+    <a href="../modules/latency.html">Latency</a>
+    <a href="../modules/collector-sidecar.html">Collector-Sidecar</a>
+    <a href="../modules/gateway.html">Gateway</a>
+    <a href="../modules/exit-node.html">Exit-Node</a>
+    <a href="../modules/client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="first-deploy.html" class="active">Lần đầu</a>
+    <a href="relay-nodes.html">Relay Nodes</a>
+    <a href="secrets.html">Secrets</a>
+    <a href="version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">← Trang chủ</a>
+  </nav>
+
+  <main>
+    <h1>Hướng dẫn deploy lần đầu — vpn2 + vpn6</h1>
+    <p class="subtitle">last_verified_at: 2026-06-21 &nbsp;·&nbsp; applies_to: TailscaleRemote control plane (vpn2 primary + vpn6 HA)</p>
+
+    <h2>Tổng quan</h2>
+    <p>Tài liệu này hướng dẫn deploy toàn bộ hệ thống TailscaleRemote lên hai node chính lần đầu tiên từ đầu (greenfield). Các bước phải thực hiện <strong>đúng thứ tự</strong> vì có dependency vòng: headscale phải chạy trước mới lấy được <code>noise_private.key</code> và pre-auth key; pre-auth key cần trước khi <code>collector-sidecar</code> join tailnet.</p>
+    <p><strong>Thứ tự tổng quát:</strong></p>
+    <pre><code>Chuẩn bị ngoài (DB, OAuth, secrets)
+    → Build images
+        → Deploy vpn2 (lần 1, không có noise key)
+            → Lấy noise key + pre-auth key
+                → Set secrets
+                    → Re-deploy vpn2 (lần 2, đầy đủ)
+                        → Deploy vpn6
+                            → Cấu hình Cloudflare LB
+                                → Kiểm tra</code></pre>
+
+    <hr>
+
+    <h2>Yêu cầu hạ tầng</h2>
+    <table>
+      <thead>
+        <tr><th>Node</th><th>OS</th><th>IP</th><th>Domain</th><th>Ghi chú</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>vpn2</td><td>Ubuntu 22.04+</td><td>165.22.12.169</td><td>vpn2.hangocthanh.io.vn</td><td>Primary, Docker phải cài sẵn</td></tr>
+        <tr><td>vpn6</td><td>Ubuntu 22.04+</td><td>45.119.87.220</td><td>—</td><td>HA replica, Caddy system install sẵn</td></tr>
+      </tbody>
+    </table>
+    <p><strong>Phần mềm cần trên mỗi node trước khi deploy:</strong></p>
+    <pre><code># Ubuntu — cài Docker:
+curl -fsSL https://get.docker.com | sh
+systemctl enable docker
+systemctl start docker
+
+# Thêm user vào group docker (nếu không dùng root):
+usermod -aG docker $USER</code></pre>
+    <p><strong>Phần mềm cần trên máy local (Windows):</strong></p>
+    <pre><code># GitHub CLI:
+winget install GitHub.cli
+gh auth login
+
+# OpenSSL (để tạo SESSION_SECRET):
+winget install ShiningLight.OpenSSL</code></pre>
+
+    <hr>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Tạo Neon Postgres databases</h2>
+        <ol>
+          <li>Truy cập <a href="https://console.neon.tech" target="_blank">console.neon.tech</a> → Sign up / Login</li>
+          <li>Create project: <code>tailscale-remote</code></li>
+          <li>Tạo <strong>2 databases</strong> trong project:</li>
+        </ol>
+
+        <h3>Database 1: <code>tailscale_remote</code> (cho api-center)</h3>
+        <pre><code>Database name: tailscale_remote
+Branch: main</code></pre>
+        <p>Lấy connection string (dạng <code>postgres://user:pass@ep-xxx.us-east-1.aws.neon.tech/tailscale_remote?sslmode=require</code>) → lưu làm <code>DATABASE_URL</code>.</p>
+
+        <h3>Database 2: <code>headscale</code> (cho derp-controller)</h3>
+        <pre><code>Database name: headscale
+Branch: main</code></pre>
+        <p>Từ connection string tách ra:</p>
+        <table>
+          <thead><tr><th>Secret name</th><th>Giá trị ví dụ</th></tr></thead>
+          <tbody>
+            <tr><td><code>HS_DB_HOST</code></td><td><code>ep-xxx.us-east-1.aws.neon.tech</code></td></tr>
+            <tr><td><code>HS_DB_NAME</code></td><td><code>headscale</code></td></tr>
+            <tr><td><code>HS_DB_USER</code></td><td><code>neondb_owner</code> (hoặc user bạn tạo)</td></tr>
+            <tr><td><code>HS_DB_PASS</code></td><td><code>AbcXyz123...</code></td></tr>
+          </tbody>
+        </table>
+        <div class="warn"><strong>Lưu ý:</strong> Neon free tier tắt DB sau 5 phút không hoạt động. Headscale và api-center đều có connection pool + retry — không ảnh hưởng khi đang chạy. Lần cold start đầu tiên mỗi ngày có thể delay ~2s.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Tạo Google OAuth application</h2>
+        <ol>
+          <li>Truy cập <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a></li>
+          <li>Tạo hoặc chọn project</li>
+          <li>Vào <strong>APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong></li>
+          <li>Application type: <strong>Web application</strong></li>
+          <li>Authorized redirect URIs — thêm:</li>
+        </ol>
+        <pre><code>https://vpn2.hangocthanh.io.vn/app/api/auth/google/callback</code></pre>
+        <p>Lưu:</p>
+        <table>
+          <thead><tr><th>Secret name</th><th>Mô tả</th></tr></thead>
+          <tbody>
+            <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>Dạng <code>1234567890-abc.apps.googleusercontent.com</code></td></tr>
+            <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td>Dạng <code>GOCSPX-...</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Set GitHub Secrets</h2>
+        <p>Từ thư mục repo local (<code>D:\05. Peru\03.Taile\TailscaleRemote</code>):</p>
+        <pre><code># SSH keys phải tồn tại tại các path sau:
+# C:\Users\Hoanglong\keys\id_rsa      → vpn2
+# C:\Users\Hoanglong\keys\vpn6_key   → vpn6
+
+# Infrastructure secrets:
+gh secret set VPN2_HOST --body "165.22.12.169"
+gh secret set VPN2_USER --body "root"
+gh secret set VPN2_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\id_rsa" -Raw)
+
+gh secret set VPN6_HOST --body "45.119.87.220"
+gh secret set VPN6_USER --body "root"
+gh secret set VPN6_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\vpn6_key" -Raw)
+
+# Database:
+gh secret set DATABASE_URL --body "postgres://user:pass@ep-xxx.us-east-1.aws.neon.tech/tailscale_remote?sslmode=require"
+gh secret set HS_DB_HOST   --body "ep-xxx.us-east-1.aws.neon.tech"
+gh secret set HS_DB_NAME   --body "headscale"
+gh secret set HS_DB_USER   --body "neondb_owner"
+gh secret set HS_DB_PASS   --body "your_password_here"
+
+# Google OAuth:
+gh secret set GOOGLE_CLIENT_ID     --body "1234567890-abc.apps.googleusercontent.com"
+gh secret set GOOGLE_CLIENT_SECRET --body "GOCSPX-..."
+
+# Session (tạo random 32-byte hex):
+$sessionSecret = -join ((1..32) | ForEach-Object { '{0:x2}' -f (Get-Random -Maximum 256) })
+gh secret set SESSION_SECRET --body $sessionSecret
+
+# Allowed admin emails:
+gh secret set ALLOWED_EMAILS --body "hangocthanhperu3107@gmail.com"
+
+# TS_AUTHKEY và HEADSCALE_NOISE_KEY sẽ set ở Bước 6 (sau khi headscale chạy)</code></pre>
+        <div class="note"><strong>Kiểm tra secrets đã set:</strong>
+<pre style="margin:8px 0 0"><code>gh secret list</code></pre></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Build tất cả Docker images</h2>
+        <p>Trigger từng workflow build (chạy lần lượt hoặc song song — độc lập nhau):</p>
+        <pre><code>cd D:\05. Peru\03.Taile\TailscaleRemote
+
+gh workflow run module-derp-controller.yml
+gh workflow run module-api-center.yml
+gh workflow run module-admin-ui.yml
+gh workflow run module-derp-relay.yml
+gh workflow run module-latency.yml
+gh workflow run module-collector-sidecar.yml
+gh workflow run module-gateway.yml</code></pre>
+        <p>Theo dõi tiến trình:</p>
+        <pre><code># Xem tất cả run đang chạy:
+gh run list --limit 20
+
+# Xem log chi tiết từng workflow:
+gh run list --workflow=module-derp-controller.yml
+gh run view &lt;RUN_ID&gt; --log</code></pre>
+        <p>Chờ tất cả workflows hiện <code>✓ completed</code> trước khi sang Bước 5.</p>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Deploy vpn2 lần đầu (không có noise key)</h2>
+        <pre><code>gh workflow run deploy-control-plane.yml `
+  -f confirm=deploy `
+  -f target=vpn2</code></pre>
+        <p>Workflow sẽ thực hiện (tự động):</p>
+        <pre><code>1. SSH vào vpn2 (165.22.12.169)
+2. Tạo /opt/tailscale-remote/deploy/vpn2/
+3. Upload:
+   - docker-compose.yml
+   - Caddyfile
+   - config/ (headscale config, derpmap template)
+4. Tạo .env từ GitHub Secrets
+5. docker compose pull (pull từ GHCR)
+6. docker compose up -d
+7. Health check: curl http://localhost/healthz → "ok"</code></pre>
+        <p>Theo dõi:</p>
+        <pre><code>gh run list --workflow=deploy-control-plane.yml
+gh run view &lt;RUN_ID&gt; --log</code></pre>
+        <p>Kiểm tra nhanh sau deploy:</p>
+        <pre><code># Từ máy local — kiểm tra health:
+curl https://vpn2.hangocthanh.io.vn/healthz
+# Kết quả mong đợi: ok</code></pre>
+        <div class="warn"><strong>Lưu ý:</strong> Ở bước này <code>collector-sidecar</code> sẽ <strong>không</strong> join tailnet được vì <code>TS_AUTHKEY</code> chưa có. Đây là bình thường — container sẽ restart loop, sẽ fix ở Bước 7.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Lấy noise_private.key và tạo pre-auth key</h2>
+        <p>SSH vào vpn2:</p>
+        <pre><code>ssh root@165.22.12.169</code></pre>
+
+        <h3>6.1 Lấy noise_private.key</h3>
+        <pre><code># Chờ headscale generate key lần đầu (thường &lt; 10s sau khi container chạy):
+docker exec derp-controller cat /etc/headscale-keys/noise_private.key</code></pre>
+        <p>Output sẽ dạng:</p>
+        <pre><code>privkey:0a1b2c3d4e5f...64-char-hex</code></pre>
+        <p>Encode sang base64 để set secret an toàn:</p>
+        <pre><code>docker exec derp-controller \
+  cat /etc/headscale-keys/noise_private.key | base64 -w 0</code></pre>
+        <p>Copy toàn bộ output (1 dòng base64, không xuống dòng).</p>
+
+        <h3>6.2 Tạo pre-auth key cho collector-sidecar</h3>
+        <pre><code># Tạo reusable key, hạn 365 ngày, namespace "main":
+docker exec derp-controller \
+  headscale preauthkeys create --reusable --expiration 365d -u main</code></pre>
+        <p>Output ví dụ:</p>
+        <pre><code>2026-06-21 12:34:56 [INFO] Created new preauthkey...
+tskey-auth-AbcDef...</code></pre>
+        <p>Copy key bắt đầu bằng <code>tskey-auth-...</code>.</p>
+
+        <h3>6.3 Set secrets</h3>
+        <p>Từ máy local (PowerShell):</p>
+        <pre><code># noise key (paste output base64 từ bước 6.1):
+gh secret set HEADSCALE_NOISE_KEY --body "BASE64_OUTPUT_FROM_ABOVE"
+
+# pre-auth key (paste key tskey-auth-... từ bước 6.2):
+gh secret set TS_AUTHKEY --body "tskey-auth-AbcDef..."</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Re-deploy vpn2 với đầy đủ secrets</h2>
+        <pre><code>gh workflow run deploy-control-plane.yml `
+  -f confirm=deploy `
+  -f target=vpn2</code></pre>
+        <p>Lần này <code>collector-sidecar</code> sẽ có <code>TS_AUTHKEY</code> → join tailnet thành công.</p>
+        <p>Kiểm tra sau deploy:</p>
+        <pre><code># SSH vào vpn2:
+ssh root@165.22.12.169
+cd /opt/tailscale-remote/deploy/vpn2
+
+# Xem tất cả containers:
+docker compose ps
+
+# collector-sidecar phải ở trạng thái "running" (không phải "restarting"):
+docker compose logs collector-sidecar --tail=20
+
+# Kiểm tra tailnet join:
+docker exec collector-sidecar tailscale status</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">8</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Deploy vpn6</h2>
+        <pre><code>gh workflow run deploy-control-plane.yml `
+  -f confirm=deploy `
+  -f target=vpn6</code></pre>
+        <p>Workflow sẽ:</p>
+        <ul>
+          <li>SSH vào vpn6 (45.119.87.220)</li>
+          <li>Cài đặt tương tự vpn2 nhưng không có: <code>latency</code>, <code>collector-sidecar</code>, <code>gateway</code> (Caddy riêng)</li>
+          <li>Caddy trên vpn6 dùng snippet include từ <code>/etc/caddy/tailscale-remote.conf</code></li>
+        </ul>
+        <p>Kiểm tra:</p>
+        <pre><code># SSH vào vpn6:
+ssh root@45.119.87.220
+
+docker compose ps
+curl http://localhost/healthz
+# → ok</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">9</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Cấu hình Cloudflare DNS Load Balancer</h2>
+        <ol>
+          <li>Đăng nhập <a href="https://dash.cloudflare.com" target="_blank">dash.cloudflare.com</a> → chọn domain <code>hangocthanh.io.vn</code></li>
+          <li>Vào <strong>Traffic → Load Balancing → Create Load Balancer</strong></li>
+        </ol>
+
+        <h3>Tạo Origin Pool</h3>
+        <pre><code>Pool name: tailscale-remote-pool
+Origins:
+  - Name: vpn2
+    Address: 165.22.12.169
+    Weight: 1
+  - Name: vpn6
+    Address: 45.119.87.220
+    Weight: 1
+Health check monitor: (tạo mới)
+  - Type: HTTPS
+  - Path: /healthz
+  - Expected codes: 200
+  - Expected body: ok
+  - Interval: 30
+  - Retries: 2
+  - Timeout: 5</code></pre>
+
+        <h3>Tạo Load Balancer</h3>
+        <pre><code>Hostname: vpn2.hangocthanh.io.vn
+Pools: tailscale-remote-pool
+Fallback pool: tailscale-remote-pool (same)
+Session affinity: None (stateless)
+Steering policy: Round Robin
+Proxy status: Proxied (orange cloud) — bật để dùng WAF</code></pre>
+
+        <div class="warn"><strong>Lưu ý UDP (STUN):</strong> Cloudflare free tier không proxy UDP. STUN port 3478 UDP phải trỏ trực tiếp về vpn2 bằng DNS A record riêng:
+<pre style="margin:8px 0 0"><code>stun.hangocthanh.io.vn  A  165.22.12.169  (DNS only, không proxy)</code></pre>
+Hoặc configure Tailscale client dùng STUN server riêng.</div>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">10</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Kiểm tra toàn hệ thống</h2>
+
+        <h3>Health checks</h3>
+        <pre><code># Control plane health:
+curl https://vpn2.hangocthanh.io.vn/healthz
+# → ok
+
+# API endpoint:
+curl https://vpn2.hangocthanh.io.vn/app/api/derp
+# → JSON array: [{"id":1,"hostname":"vpn2.hangocthanh.io.vn",...}]
+
+# DERP relay probe:
+curl https://vpn2.hangocthanh.io.vn/derp/probe
+# → HTTP 200
+
+# Headscale key endpoint (Tailscale client dùng cái này):
+curl https://vpn2.hangocthanh.io.vn/key
+# → JSON với publicKey</code></pre>
+
+        <h3>Admin UI</h3>
+        <pre><code>1. Mở browser: https://vpn2.hangocthanh.io.vn/app/
+2. Click "Login with Google"
+3. Đăng nhập với hangocthanhperu3107@gmail.com
+4. Sau login → redirect về dashboard
+5. Kiểm tra menu: DERP Regions, Nodes, Latency</code></pre>
+
+        <h3>Version check</h3>
+        <pre><code>gh workflow run check-versions.yml
+gh run list --workflow=check-versions.yml
+# Chờ complete rồi xem log
+gh run view &lt;RUN_ID&gt; --log</code></pre>
+
+        <h3>Container status tổng quan</h3>
+        <pre><code># SSH vpn2:
+ssh root@165.22.12.169
+cd /opt/tailscale-remote/deploy/vpn2
+docker compose ps
+
+# Kết quả mong đợi (tất cả Up):
+# derp-controller    Up
+# api-center         Up
+# admin-ui           Up
+# derp-relay         Up
+# latency            Up
+# collector-sidecar  Up
+# gateway            Up</code></pre>
+      </div>
+    </div>
+
+    <hr>
+
+    <h2>Troubleshooting</h2>
+
+    <h3>derp-controller không start</h3>
+    <pre><code>ssh root@165.22.12.169
+cd /opt/tailscale-remote/deploy/vpn2
+docker compose logs derp-controller --tail=50</code></pre>
+    <p>Lỗi thường gặp:</p>
+    <table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>cannot connect to database</code></td><td>HS_DB_* sai hoặc Neon DB tắt</td><td>Kiểm tra secrets, thử connect thủ công</td></tr>
+        <tr><td><code>failed to load private key</code></td><td>HEADSCALE_NOISE_KEY sai format</td><td>Re-encode base64, re-deploy</td></tr>
+        <tr><td><code>address already in use :3478</code></td><td>Port conflict</td><td><code>ss -tulpn | grep 3478</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>api-center auth fail</h3>
+    <pre><code>docker compose logs api-center --tail=50</code></pre>
+    <table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>Invalid OAuth callback</code></td><td>Redirect URI không khớp</td><td>Kiểm tra Google Console URI</td></tr>
+        <tr><td><code>User not allowed</code></td><td>Email không trong ALLOWED_EMAILS</td><td>Cập nhật secret</td></tr>
+        <tr><td><code>DATABASE_URL invalid</code></td><td>Connection string sai</td><td>Kiểm tra Neon dashboard</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Caddy/gateway TLS fail</h3>
+    <pre><code>docker compose logs gateway --tail=50</code></pre>
+    <table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>certificate authority error</code></td><td>Domain chưa trỏ về IP</td><td>Kiểm tra DNS propagation</td></tr>
+        <tr><td><code>connection refused :80</code></td><td>Firewall block port 80</td><td><code>ufw allow 80</code></td></tr>
+        <tr><td><code>bind: permission denied</code></td><td>Port &lt; 1024 cần root</td><td>Chạy Docker với root hoặc cấp capability</td></tr>
+      </tbody>
+    </table>
+
+    <h3>collector-sidecar loop restart</h3>
+    <pre><code>docker compose logs collector-sidecar --tail=30</code></pre>
+    <table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>invalid auth key</code></td><td>TS_AUTHKEY hết hạn hoặc sai</td><td>Tạo key mới (Bước 6.2), re-deploy</td></tr>
+        <tr><td><code>failed to connect to control</code></td><td>vpn2 chưa healthy khi container start</td><td><code>docker compose restart collector-sidecar</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Server migration (chuyển sang server mới)</h3>
+    <p>Khi cần chuyển vpn2 sang IP/server mới:</p>
+    <pre><code># 1. Backup volumes quan trọng trên server cũ:
+ssh root@165.22.12.169
+docker run --rm \
+  -v derp_controller_run:/data \
+  -v /tmp/backup:/backup \
+  alpine tar czf /backup/derp_controller_run.tar.gz /data
+scp root@165.22.12.169:/tmp/backup/derp_controller_run.tar.gz .
+
+# 2. Update GitHub Secret VPN2_HOST với IP mới
+gh secret set VPN2_HOST --body "NEW_IP"
+
+# 3. Cập nhật DNS A record về IP mới
+
+# 4. Re-deploy
+gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=vpn2
+
+# 5. Restore volume (nếu cần giữ noise key cũ):
+# Trên server mới:
+docker run --rm \
+  -v derp_controller_run:/data \
+  -v /tmp/backup:/backup \
+  alpine tar xzf /backup/derp_controller_run.tar.gz -C /</code></pre>
+  </main>
+</body>
+</html>

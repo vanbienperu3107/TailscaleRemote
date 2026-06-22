@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Latency — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .meta-item { background: #111827; border: 1px solid #1e2d4a; border-radius: 6px; padding: 12px 14px; }
+    .meta-item .k { font-size: 11px; color: #475569; font-weight: 600; text-transform: uppercase; margin-bottom: 4px; }
+    .meta-item .v { font-size: 13px; color: #94a3b8; word-break: break-all; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="derp-controller.html">DERP-Controller</a>
+    <a href="api-center.html">Api-Center</a>
+    <a href="admin-ui.html">Admin-UI</a>
+    <a href="derp-relay.html">DERP-Relay</a>
+    <a href="latency.html" class="active">Latency</a>
+    <a href="collector-sidecar.html">Collector-Sidecar</a>
+    <a href="gateway.html">Gateway</a>
+    <a href="exit-node.html">Exit-Node</a>
+    <a href="client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="../deploy/first-deploy.html">Lần đầu</a>
+    <a href="../deploy/relay-nodes.html">Relay Nodes</a>
+    <a href="../deploy/secrets.html">Secrets</a>
+    <a href="../deploy/version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">&#8592; Trang chủ</a>
+  </nav>
+  <main>
+    <h1>Module: latency (node-dedup + collector)</h1>
+    <p class="subtitle">Collector HTTP server, node dedup, auto-approve routes — chạy trên vpn2</p>
+
+    <h2>Tổng quan</h2>
+    <div class="meta-grid">
+      <div class="meta-item"><div class="k">Image</div><div class="v">ghcr.io/vanbienperu3107/latency:latest</div></div>
+      <div class="meta-item"><div class="k">Source</div><div class="v">modules/latency/dedup.py (Python 3.12)</div></div>
+      <div class="meta-item"><div class="k">Chạy trên</div><div class="v">vpn2 only</div></div>
+      <div class="meta-item"><div class="k">Port</div><div class="v">8090 (HTTP collector, chỉ trong tailnet)</div></div>
+    </div>
+
+    <h2>Mục đích</h2>
+    <p>Module <code>latency</code> là thành phần trung tâm trên vpn2, đảm nhiệm ba chức năng độc lập trong một tiến trình Python duy nhất:</p>
+    <ol>
+      <li><strong>Node Dedup</strong> — Tự động dọn dẹp node trùng trong Headscale.</li>
+      <li><strong>Collector</strong> — HTTP server nhận báo cáo latency từ relay nodes và Windows client, phục vụ dashboard và API.</li>
+      <li><strong>Auto-approve Routes</strong> — Tự động duyệt route advertisement, không cần tác động thủ công.</li>
+    </ol>
+    <div class="warn">Module này <strong>phải chạy cùng host với <code>collector-sidecar</code></strong> (chia sẻ unix socket).</div>
+
+    <h2>Kiến trúc tổng thể</h2>
+    <pre><code>                    +---------------------------------+
+                    |         vpn2 host                |
+                    |                                  |
+  relay nodes -----&gt;|  collector-sidecar               |
+  (qua tailnet)    |  (tailscale + socat :8090)       |
+                    |         |                        |
+                    |         v forward                |
+                    |  +---------------------------+   |
+                    |  |   latency container        |   |
+                    |  |                           |   |
+                    |  |  [Node Dedup]             |   |
+                    |  |  poll Headscale API       |   |
+                    |  |  xoa node trung           |   |
+                    |  |                           |   |
+                    |  |  [Collector :8090]        |   |
+                    |  |  POST /metrics/report     |&lt;--+-- vpn3/vpn4/vpn6 reporter
+                    |  |  GET  /metrics/latency    |   |   Windows client
+                    |  |  GET  /metrics/health     |   |
+                    |  |  GET  /stats              |   |
+                    |  |  GET  /derp-status        |   |
+                    |  |                           |   |
+                    |  |  [Auto-approve Routes]    |   |
+                    |  |  poll &amp; approve           |   |
+                    |  |                           |   |
+                    |  |  [Server Ping]            |   |
+                    |  |  LocalAPI -&gt; ping peers   |   |
+                    |  +---------------------------+   |
+                    |         | ts_sock volume          |
+                    |         v                        |
+                    |  /var/run/tailscale/tailscaled.sock |
+                    +---------------------------------+</code></pre>
+
+    <h2>Phần 1: Node Dedup</h2>
+
+    <h3>Vấn đề</h3>
+    <p>Headscale tạo <strong>node mới</strong> mỗi khi machine key thay đổi (cài lại Tailscale, build mới từ source, thư mục state mới). Kết quả là nhiều node có cùng hostname nhưng <code>given_name</code> bị thêm hậu tố ngẫu nhiên, ví dụ:</p>
+    <pre><code>itop-thanhhn          &lt;- keeper (online)
+itop-thanhhn5-i8shta5a &lt;- trung (offline, can xoa)
+itop-thanhhn5-k9wqp2x &lt;- trung (offline, can xoa)</code></pre>
+
+    <h3>Logic dedup</h3>
+    <pre><code>Poll Headscale API (moi POLL_INTERVAL giay)
+    |
+    |-- Gom node theo (user, hostname)
+    |
+    |-- Voi moi nhom co &gt; 1 node:
+    |       Chon "keeper":
+    |         1. Uu tien node dang ONLINE
+    |         2. Neu tie: node co last_seen moi nhat
+    |         3. Neu van tie: node co id nho nhat
+    |
+    |-- Xoa tat ca node OFFLINE con lai trong nhom
+    |     (neu DRY_RUN=false)
+    |
+    |-- Doi given_name cua keeper ve hostname sach
+    |     (bo hau to, vi du: "itop-thanhhn5-i8shta5a" -&gt; "itop-thanhhn")
+    |     (neu DRY_RUN=false)
+    |
+    +-- Luu vao SQLite (bang devices)</code></pre>
+    <div class="note"><strong>Idempotent:</strong> Chạy nhiều lần với cùng state Headscale cho cùng kết quả. An toàn để chạy liên tục.</div>
+
+    <h3>Lưu ý DRY_RUN</h3>
+    <div class="warn"><code>DRY_RUN=true</code> — chỉ log hành động dự kiến, không gọi API xóa/đổi tên. Dùng khi debug hoặc kiểm tra trước khi đưa vào production.</div>
+
+    <h2>Phần 2: Collector (HTTP server)</h2>
+    <p>HTTP server lắng nghe port <code>8090</code>. <strong>Chỉ nhận request từ tailnet</strong> (IP-based auth, không dùng token).</p>
+
+    <h3>Endpoints</h3>
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Mô tả</th></tr></thead>
+      <tbody>
+        <tr><td><code>POST</code></td><td><code>/metrics/report</code></td><td>Nhận báo cáo latency từ reporter (relay nodes) hoặc Windows client</td></tr>
+        <tr><td><code>GET</code></td><td><code>/metrics/latency</code></td><td>Trả aggregated latency JSON (trong <code>LATENCY_WINDOW</code> giây gần nhất)</td></tr>
+        <tr><td><code>GET</code></td><td><code>/metrics/health</code></td><td>Smoke gate sau deploy. Query params: <code>expect=collector,vpn3,vpn4</code>, <code>window=180</code></td></tr>
+        <tr><td><code>GET</code></td><td><code>/stats</code> hoặc <code>/metrics/stats</code></td><td>Dashboard HTML với Chart.js, auto-refresh 30s</td></tr>
+        <tr><td><code>GET</code></td><td><code>/derp</code> hoặc <code>/derp-status</code></td><td>DERP status page: probe kết quả + bảng peer relay</td></tr>
+        <tr><td><code>GET</code></td><td><code>/metrics/netcheck</code></td><td>Nhận netcheck từ client (POST netcheck)</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Cấu trúc POST /metrics/report</h3>
+    <pre><code>{
+  "src": "vpn3",
+  "dst": "itop-thanhhn",
+  "dst_ip": "100.64.x.x",
+  "rtt_ms": 12.4,
+  "path": "direct",
+  "ok": true
+}</code></pre>
+
+    <h3>Auth model (IP-based)</h3>
+    <p>Collector chấp nhận request từ:</p>
+    <table>
+      <thead><tr><th>Dải IP</th><th>Nguồn</th></tr></thead>
+      <tbody>
+        <tr><td><code>100.64.0.0/10</code></td><td>Tailnet (IPv4)</td></tr>
+        <tr><td><code>fd7a::/16</code></td><td>Tailnet (IPv6)</td></tr>
+        <tr><td><code>127.0.0.0/8</code></td><td>Loopback</td></tr>
+        <tr><td><code>10.0.0.0/8</code></td><td>Docker network</td></tr>
+        <tr><td><code>172.16.0.0/12</code></td><td>Docker network</td></tr>
+        <tr><td><code>192.168.0.0/16</code></td><td>Docker network</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Lý do chấp nhận Docker network:</strong> collector-sidecar dùng <code>socat</code> để forward port. <code>socat</code> làm mất IP gốc của caller, request đến collector có IP là Docker bridge network.</div>
+
+    <h3>GET /metrics/health</h3>
+    <p>Dùng làm smoke gate sau mỗi lần deploy. Ví dụ:</p>
+    <pre><code>GET /metrics/health?expect=collector,vpn3,vpn4&amp;window=180</code></pre>
+    <ul>
+      <li><code>expect</code>: danh sách <code>src</code> phải có báo cáo trong khoảng thời gian <code>window</code> giây.</li>
+      <li><code>window</code>: số giây tính ngược từ thời điểm hiện tại.</li>
+      <li>Trả <code>200 OK</code> nếu tất cả <code>expect</code> đều có báo cáo; trả <code>503</code> nếu thiếu.</li>
+    </ul>
+
+    <h2>Phần 3: Auto-approve Routes</h2>
+    <p>Tự động duyệt mọi route mà node advertise qua Headscale API. Không cần tag đặc biệt, không cần duyệt tay qua CLI.</p>
+    <div class="note"><strong>Idempotent:</strong> Route đã approved không bị thay đổi. Chỉ approve route mới chưa được duyệt.</div>
+
+    <h2>Server Ping</h2>
+    <p>Ngoài việc nhận báo cáo từ relay nodes, latency module còn <strong>tự ping</strong> tất cả node ONLINE qua LocalAPI của collector-sidecar.</p>
+    <pre><code>latency module
+    |
+    +-- ts_sock volume -&gt; /var/run/tailscale/tailscaled.sock (cua collector-sidecar)
+            |
+            |-- GET /localapi/v0/status -&gt; danh sach peer online
+            +-- POST /localapi/v0/ping?ip=X&amp;type=disco -&gt; RTT
+                    -&gt; luu vao node_latency voi src="collector"</code></pre>
+
+    <h2>SQLite Database</h2>
+    <p>File: <code>/data/devices.db</code></p>
+
+    <h3>Bảng <code>devices</code></h3>
+    <p>Lưu lịch sử node dedup.</p>
+    <table>
+      <thead><tr><th>Cột</th><th>Kiểu</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><code>user</code></td><td>TEXT</td><td>PRIMARY KEY (cùng <code>hostname</code>)</td></tr>
+        <tr><td><code>hostname</code></td><td>TEXT</td><td>PRIMARY KEY</td></tr>
+        <tr><td><code>mac</code></td><td>TEXT</td><td>MAC address (từ Windows client report)</td></tr>
+        <tr><td><code>node_id</code></td><td>TEXT</td><td>Headscale node ID của keeper</td></tr>
+        <tr><td><code>ipv4</code></td><td>TEXT</td><td>Tailnet IPv4</td></tr>
+        <tr><td><code>machine_key</code></td><td>TEXT</td><td>Machine key hiện tại</td></tr>
+        <tr><td><code>first_seen</code></td><td>DATETIME</td><td>Lần đầu xuất hiện</td></tr>
+        <tr><td><code>last_seen</code></td><td>DATETIME</td><td>Lần cuối seen</td></tr>
+        <tr><td><code>seen_count</code></td><td>INTEGER</td><td>Tổng số lần thấy</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Bảng <code>node_latency</code></h3>
+    <p>Lưu toàn bộ kết quả ping/latency.</p>
+    <table>
+      <thead><tr><th>Cột</th><th>Kiểu</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>INTEGER</td><td>PK autoincrement</td></tr>
+        <tr><td><code>ts</code></td><td>DATETIME</td><td>Timestamp</td></tr>
+        <tr><td><code>src</code></td><td>TEXT</td><td>Nguồn ping (tên relay node hoặc "collector")</td></tr>
+        <tr><td><code>dst</code></td><td>TEXT</td><td>Hostname đích</td></tr>
+        <tr><td><code>dst_ip</code></td><td>TEXT</td><td>Tailnet IP đích</td></tr>
+        <tr><td><code>rtt_ms</code></td><td>REAL</td><td>Round-trip time (ms)</td></tr>
+        <tr><td><code>path</code></td><td>TEXT</td><td>"direct" hoặc "derp-vpnX"</td></tr>
+        <tr><td><code>ok</code></td><td>BOOLEAN</td><td>Ping thành công hay không</td></tr>
+      </tbody>
+    </table>
+    <p>Index trên cột <code>ts</code> để query nhanh theo time window.</p>
+
+    <h3>Bảng <code>client_netcheck</code></h3>
+    <p>Lưu kết quả netcheck từ Windows client.</p>
+    <table>
+      <thead><tr><th>Cột</th><th>Kiểu</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>INTEGER</td><td>PK autoincrement</td></tr>
+        <tr><td><code>ts</code></td><td>DATETIME</td><td>Timestamp</td></tr>
+        <tr><td><code>client</code></td><td>TEXT</td><td>Hostname của Windows client</td></tr>
+        <tr><td><code>preferred_derp</code></td><td>TEXT</td><td>DERP region được chọn</td></tr>
+        <tr><td><code>region_latency</code></td><td>JSON</td><td>Map region → latency ms</td></tr>
+      </tbody>
+    </table>
+
+    <h2>Environment Variables</h2>
+    <table>
+      <thead><tr><th>Biến</th><th>Mặc định</th><th>Bắt buộc</th><th>Mô tả</th></tr></thead>
+      <tbody>
+        <tr><td><code>HS_API_URL</code></td><td>—</td><td>Có</td><td>URL Headscale API (ví dụ: <code>http://derp-controller:8080</code>)</td></tr>
+        <tr><td><code>HS_API_KEY</code></td><td>—</td><td>Có</td><td>Headscale API key</td></tr>
+        <tr><td><code>POLL_INTERVAL</code></td><td><code>30</code></td><td>Không</td><td>Chu kỳ dedup + auto-approve + server ping (giây)</td></tr>
+        <tr><td><code>DB_PATH</code></td><td><code>/data/devices.db</code></td><td>Không</td><td>Đường dẫn SQLite database</td></tr>
+        <tr><td><code>DRY_RUN</code></td><td><code>false</code></td><td>Không</td><td><code>true</code> = chỉ log, không xóa/đổi tên node</td></tr>
+        <tr><td><code>AUTO_APPROVE_ROUTES</code></td><td><code>true</code></td><td>Không</td><td><code>true</code> = tự động approve route</td></tr>
+        <tr><td><code>METRICS_PORT</code></td><td><code>8090</code></td><td>Không</td><td>Port HTTP collector</td></tr>
+        <tr><td><code>TS_SOCKET</code></td><td><code>/var/run/tailscale/tailscaled.sock</code></td><td>Không</td><td>Unix socket của collector-sidecar (ts_sock volume)</td></tr>
+        <tr><td><code>SRC_NAME</code></td><td><code>collector</code></td><td>Không</td><td>Tên <code>src</code> dùng khi collector-sidecar tự ping</td></tr>
+        <tr><td><code>DERP_PROBE_URLS</code></td><td>—</td><td>Không</td><td>Comma-separated <code>name=url</code> probe endpoints của DERP nodes</td></tr>
+        <tr><td><code>LATENCY_WINDOW</code></td><td><code>3600</code></td><td>Không</td><td>Số giây lấy samples cho <code>/metrics/latency</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>DERP_PROBE_URLS format</h3>
+    <pre><code>vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe,vpn4-vn=https://vpn4.hangocthanh.io.vn/derp/probe,vpn6-vn=https://vpn6.hangocthanh.io.vn/derp/probe</code></pre>
+
+    <h2>Volumes</h2>
+    <pre><code>volumes:
+  - latency_data:/data                                  # SQLite DB
+  - ts_sock:/var/run/tailscale                          # Chia se voi collector-sidecar</code></pre>
+
+    <h2>COUPLING quan trọng</h2>
+    <div class="warn">
+      <strong>latency + collector-sidecar PHẢI chạy cùng host</strong> vì chia sẻ volume <code>ts_sock</code>.
+      <ul style="margin-top:8px;">
+        <li><code>latency</code> cần đọc unix socket của <code>collector-sidecar</code> để gọi LocalAPI (server ping).</li>
+        <li><code>collector-sidecar</code> dùng <code>socat</code> để forward traffic từ tailnet vào <code>latency:8090</code>.</li>
+        <li>Nếu di chuyển sang host khác, <strong>phải di chuyển cả hai</strong> cùng lúc. Không thể tách rời.</li>
+      </ul>
+    </div>
+
+    <h2>Lưu ý quan trọng</h2>
+    <div class="warn">
+      <ul>
+        <li><strong>Port 8090 không được expose ra internet.</strong> Chỉ lắng nghe trong tailnet. collector-sidecar chịu trách nhiệm nhận traffic từ tailnet và forward vào.</li>
+        <li><strong>Database migration:</strong> Khi cập nhật schema SQLite, cần migration script hoặc xóa và recreate DB (mất lịch sử). Nên backup <code>/data/devices.db</code> trước khi update image.</li>
+        <li><strong>DERP_PROBE_URLS:</strong> Nếu không set, <code>/derp-status</code> vẫn hoạt động nhưng không có kết quả probe. Cần update khi thêm/bớt relay node.</li>
+        <li><strong>Headscale API key rotation:</strong> Khi đổi <code>HS_API_KEY</code>, restart latency container. Key cũ không còn dùng được ngay lập tức.</li>
+      </ul>
+    </div>
+  </main>
+</body>
+</html>

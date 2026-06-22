@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deploy Relay Nodes — TailscaleRemote Docs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: #0d1526; border-right: 1px solid #1e2d4a; padding: 24px 0; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+    nav .logo { padding: 0 20px 24px; font-weight: 700; font-size: 14px; color: #38bdf8; border-bottom: 1px solid #1e2d4a; margin-bottom: 16px; }
+    nav .section { padding: 4px 20px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; margin-top: 16px; margin-bottom: 4px; }
+    nav a { display: block; padding: 6px 20px; font-size: 13px; color: #94a3b8; text-decoration: none; transition: all 0.15s; }
+    nav a:hover, nav a.active { color: #e2e8f0; background: #1e2d4a; }
+    nav a.active { color: #38bdf8; border-left: 2px solid #38bdf8; }
+    main { flex: 1; padding: 40px 48px; max-width: 900px; }
+    h1 { font-size: 28px; font-weight: 700; color: #f1f5f9; margin-bottom: 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid #1e2d4a; }
+    h2 { font-size: 18px; font-weight: 600; color: #f1f5f9; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 1px solid #1e2d4a; }
+    h3 { font-size: 15px; font-weight: 600; color: #cbd5e1; margin: 24px 0 8px; }
+    h4 { font-size: 13px; font-weight: 600; color: #94a3b8; margin: 16px 0 6px; }
+    p { color: #cbd5e1; line-height: 1.7; margin-bottom: 12px; font-size: 14px; }
+    ul, ol { padding-left: 20px; color: #cbd5e1; font-size: 14px; line-height: 1.8; margin-bottom: 12px; }
+    li { margin-bottom: 2px; }
+    code { background: #1e293b; color: #7dd3fc; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono','Fira Code',monospace; font-size: 12px; }
+    pre { background: #0f1629; border: 1px solid #1e2d4a; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 12px 0 20px; }
+    pre code { background: none; color: #94a3b8; padding: 0; font-size: 13px; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 13px; }
+    th { background: #0f172a; color: #94a3b8; font-weight: 600; text-align: left; padding: 10px 14px; border-bottom: 1px solid #1e2d4a; }
+    td { padding: 9px 14px; border-bottom: 1px solid #1a2540; color: #cbd5e1; vertical-align: top; }
+    tr:hover td { background: #111827; }
+    a { color: #38bdf8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: #f1f5f9; font-weight: 600; }
+    em { color: #94a3b8; font-style: italic; }
+    .note { background: #0f2318; border: 1px solid #16a34a33; border-left: 3px solid #16a34a; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #86efac; }
+    .warn { background: #1c1407; border: 1px solid #ca8a0444; border-left: 3px solid #ca8a04; border-radius: 6px; padding: 10px 14px; margin: 12px 0; font-size: 13px; color: #fde68a; }
+    .step { display: flex; gap: 16px; margin-bottom: 20px; }
+    .step-num { background: #1e3a5f; color: #38bdf8; font-weight: 700; font-size: 14px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+    .step-body { flex: 1; }
+    hr { border: none; border-top: 1px solid #1e2d4a; margin: 32px 0; }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="logo">TailscaleRemote Docs</div>
+    <div class="section">Modules</div>
+    <a href="../modules/derp-controller.html">DERP-Controller</a>
+    <a href="../modules/api-center.html">Api-Center</a>
+    <a href="../modules/admin-ui.html">Admin-UI</a>
+    <a href="../modules/derp-relay.html">DERP-Relay</a>
+    <a href="../modules/latency.html">Latency</a>
+    <a href="../modules/collector-sidecar.html">Collector-Sidecar</a>
+    <a href="../modules/gateway.html">Gateway</a>
+    <a href="../modules/exit-node.html">Exit-Node</a>
+    <a href="../modules/client-mod.html">Client-Mod</a>
+    <div class="section">Kiến trúc</div>
+    <a href="../architecture/overview.html">Tổng quan</a>
+    <a href="../architecture/ha-lb.html">HA &amp; LB</a>
+    <div class="section">Deploy</div>
+    <a href="first-deploy.html">Lần đầu</a>
+    <a href="relay-nodes.html" class="active">Relay Nodes</a>
+    <a href="secrets.html">Secrets</a>
+    <a href="version-check.html">Version Check</a>
+    <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">← Trang chủ</a>
+  </nav>
+
+  <main>
+    <h1>Hướng dẫn deploy relay node mới</h1>
+    <p class="subtitle">last_verified_at: 2026-06-21 &nbsp;·&nbsp; applies_to: derp-relay module — vpn3, vpn4 hoặc bất kỳ VPS standalone</p>
+
+    <h2>Tổng quan</h2>
+    <p>Một <strong>relay node</strong> chạy module <code>derp-relay</code> — image duy nhất chứa:</p>
+    <ul>
+      <li><strong><code>derper</code></strong> — DERP WebSocket relay server (Tailscale relay protocol)</li>
+      <li><strong><code>ping-reporter.py</code></strong> — script đo latency gửi về <code>collector</code> trên vpn2 qua tailnet</li>
+    </ul>
+    <p>Relay node <strong>không</strong> chạy control plane (headscale), không chạy admin-ui, không chạy latency collector.</p>
+    <p><strong>Các relay node hiện có:</strong></p>
+    <table>
+      <thead>
+        <tr><th>Node</th><th>IP</th><th>Domain</th><th>Region code</th><th>Ghi chú</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>vpn2</td><td>165.22.12.169</td><td>vpn2.hangocthanh.io.vn</td><td>vpn2-vn</td><td>Relay local trên control plane node</td></tr>
+        <tr><td>vpn3</td><td>64.176.23.196</td><td>vpn3.hangocthanh.io.vn</td><td>vpn3-vn</td><td>Ubuntu 24.04, server mới 2026-06-19</td></tr>
+        <tr><td>vpn4</td><td>(TBD)</td><td>vpn4.hangocthanh.io.vn</td><td>vpn4-vn</td><td>Chưa deploy</td></tr>
+        <tr><td>vpn6</td><td>45.119.87.220</td><td>—</td><td>vpn6-vn</td><td>Co-host với HA control plane</td></tr>
+      </tbody>
+    </table>
+
+    <hr>
+
+    <h2>Yêu cầu</h2>
+    <ul>
+      <li>Ubuntu 22.04+ (hoặc 24.04)</li>
+      <li>Docker Engine đã cài</li>
+      <li>Domain trỏ về IP server (cần cho TLS cert)</li>
+      <li>Tailscale installed trên host (để relay node join tailnet — dùng bởi ping-reporter)</li>
+      <li>Port mở: <strong>443 TCP</strong> (DERP WebSocket), <strong>3478 UDP</strong> (STUN)</li>
+      <li>Headscale đang chạy trên vpn2 (cần để tạo pre-auth key)</li>
+    </ul>
+
+    <hr>
+
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Chuẩn bị pre-auth key</h2>
+        <p>Pre-auth key dùng để <code>ping-reporter</code> join tailnet. Một key reusable dùng được cho nhiều relay node.</p>
+        <pre><code># SSH vào vpn2:
+ssh root@165.22.12.169
+
+# Tạo pre-auth key reusable, hạn 1 năm:
+docker exec derp-controller \
+  headscale preauthkeys create --reusable --expiration 365d -u main
+
+# Output ví dụ:
+# tskey-auth-AbcDefGhi123...</code></pre>
+        <p>Lưu key này. Nếu đã có key còn hạn thì dùng lại, không cần tạo mới.</p>
+        <p>Kiểm tra key hiện có:</p>
+        <pre><code>docker exec derp-controller headscale preauthkeys list -u main</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Set GitHub Secrets (chỉ cần cho relay node có CI deploy)</h2>
+        <p>Mẫu cho vpn3 (đã cấu hình sẵn):</p>
+        <pre><code># Từ D:\05. Peru\03.Taile\TailscaleRemote
+gh secret set VPN3_HOST --body "64.176.23.196"
+gh secret set VPN3_USER --body "root"
+gh secret set VPN3_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\vpn3_key" -Raw)</code></pre>
+        <p>Cho relay node mới (ví dụ vpn4):</p>
+        <pre><code>gh secret set VPN4_HOST --body "IP_CUA_VPN4"
+gh secret set VPN4_USER --body "root"
+gh secret set VPN4_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\vpn4_key" -Raw)</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Deploy tự động qua GitHub Actions (cách khuyến nghị)</h2>
+        <p>Workflow <code>module-derp-relay.yml</code> tự động build + deploy lên vpn3 khi có thay đổi trong <code>modules/derp-relay/</code>.</p>
+        <p>Trigger thủ công:</p>
+        <pre><code># Deploy derp-relay lên vpn3:
+gh workflow run module-derp-relay.yml
+
+# Theo dõi:
+gh run list --workflow=module-derp-relay.yml
+gh run view &lt;RUN_ID&gt; --log</code></pre>
+        <p>Workflow sẽ:</p>
+        <ol>
+          <li>Build image <code>ghcr.io/vanbienperu3107/derp-relay:latest</code></li>
+          <li>Push lên GHCR</li>
+          <li>SSH vào vpn3</li>
+          <li><code>docker compose pull &amp;&amp; docker compose up -d</code></li>
+          <li><code>curl http://localhost:8080/derp/probe</code> để kiểm tra</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">4</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Deploy thủ công (dùng khi không có CI hoặc relay node mới)</h2>
+
+        <h3>4.1 Cài Docker trên relay node mới</h3>
+        <pre><code>ssh root@&lt;IP_RELAY&gt;
+
+curl -fsSL https://get.docker.com | sh
+systemctl enable docker
+systemctl start docker</code></pre>
+
+        <h3>4.2 Cài Tailscale trên host (để ping-reporter join tailnet)</h3>
+        <pre><code># Ubuntu:
+curl -fsSL https://tailscale.com/install.sh | sh
+# Không chạy tailscale up ở đây — sẽ dùng trong container</code></pre>
+
+        <h3>4.3 Tạo thư mục và cấu hình</h3>
+        <pre><code>mkdir -p /opt/tailscale-remote/deploy/relay
+cd /opt/tailscale-remote/deploy/relay</code></pre>
+        <p>Tạo file <code>.env</code>:</p>
+        <pre><code>cat &gt; .env &lt;&lt; 'EOF'
+# Thay vpn3 bằng tên relay node của bạn
+DERP_HOSTNAME=vpn3.hangocthanh.io.vn
+REPORTER_NAME=vpn3
+COLLECTOR_URL=http://collector.tailnet.local:8090
+TS_AUTHKEY=tskey-auth-AbcDefGhi123...
+CONTROLLER_URL=https://vpn2.hangocthanh.io.vn
+EOF</code></pre>
+
+        <h3>4.4 Tạo docker-compose.yml</h3>
+        <pre><code>cat &gt; docker-compose.yml &lt;&lt; 'EOF'
+version: '3.8'
+
+services:
+  derp-relay:
+    image: ghcr.io/vanbienperu3107/derp-relay:latest
+    container_name: derp-relay
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - derp_certs:/certs
+    environment:
+      - DERP_HOSTNAME=${DERP_HOSTNAME}
+      - DERP_CERT_MODE=manual
+      - DERP_CERT_DIR=/certs
+      - DERP_STUN_PORT=3478
+      - DERP_HTTP_PORT=8080
+      - REPORTER_NAME=${REPORTER_NAME}
+      - COLLECTOR_URL=${COLLECTOR_URL}
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - CONTROLLER_URL=${CONTROLLER_URL}
+
+volumes:
+  derp_certs:
+    driver: local
+EOF</code></pre>
+
+        <h3>4.5 Pull và chạy container</h3>
+        <pre><code># Login GHCR (nếu image là private):
+echo $GITHUB_TOKEN | docker login ghcr.io -u vanbienperu3107 --password-stdin
+
+# Pull và chạy:
+docker compose pull
+docker compose up -d</code></pre>
+
+        <h3>4.6 Dùng setup script (nếu có trong repo)</h3>
+        <pre><code># Copy setup-relay-node.sh từ repo lên server rồi chạy:
+DERP_HOSTNAME=vpn3.hangocthanh.io.vn \
+REPORTER_NAME=vpn3 \
+CONTROLLER_URL=https://vpn2.hangocthanh.io.vn \
+TS_AUTHKEY=tskey-auth-AbcDefGhi123... \
+bash /opt/tailscale-remote/deploy/relay/setup-relay-node.sh</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">5</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Cấu hình TLS cho relay node</h2>
+        <p>DERP relay cần TLS cert vì client kết nối qua HTTPS WebSocket. Có 2 cách:</p>
+
+        <h3>Cách 1: Caddy trên host (khuyến nghị cho Ubuntu 22.04+)</h3>
+        <pre><code># Cài Caddy:
+apt install -y debian-keyring debian-archive-keyring apt-transport-https
+curl -1sLf 'https://dl.cloudflare.com/caddy/stable/gpg.key' \
+  | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+curl -1sLf 'https://dl.cloudflare.com/caddy/stable/debian.deb.txt' \
+  | tee /etc/apt/sources.list.d/caddy-stable.list
+apt update &amp;&amp; apt install caddy</code></pre>
+        <p>Tạo <code>/etc/caddy/Caddyfile</code>:</p>
+        <pre><code>vpn3.hangocthanh.io.vn {
+    reverse_proxy :8080 {
+        # Preserve WebSocket headers:
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+    }
+
+    # STUN không qua Caddy (UDP), chỉ route HTTP/WebSocket
+}</code></pre>
+        <pre><code>systemctl enable caddy
+systemctl restart caddy</code></pre>
+        <p>Caddy tự động lấy cert từ Let's Encrypt. <code>derper</code> dùng <code>certmode=manual</code> đọc từ <code>/certs</code> volume nếu cần cert offline.</p>
+
+        <h3>Cách 2: Cert thủ công (cho môi trường không có Caddy)</h3>
+        <pre><code># Lấy cert bằng certbot:
+apt install certbot
+certbot certonly --standalone -d vpn3.hangocthanh.io.vn
+
+# Copy cert vào volume Docker:
+docker_vol=$(docker volume inspect derp_certs --format '{{.Mountpoint}}')
+cp /etc/letsencrypt/live/vpn3.hangocthanh.io.vn/fullchain.pem \
+   $docker_vol/vpn3.hangocthanh.io.vn.crt
+cp /etc/letsencrypt/live/vpn3.hangocthanh.io.vn/privkey.pem \
+   $docker_vol/vpn3.hangocthanh.io.vn.key
+
+# Restart để load cert mới:
+docker compose restart derp-relay</code></pre>
+        <p>Cron job tự renew:</p>
+        <pre><code># /etc/cron.d/certbot-derp
+0 3 1 * * root certbot renew --quiet &amp;&amp; \
+  cp /etc/letsencrypt/live/vpn3.hangocthanh.io.vn/fullchain.pem \
+     $(docker volume inspect derp_certs --format '{{.Mountpoint}}')/vpn3.hangocthanh.io.vn.crt &amp;&amp; \
+  cp /etc/letsencrypt/live/vpn3.hangocthanh.io.vn/privkey.pem \
+     $(docker volume inspect derp_certs --format '{{.Mountpoint}}')/vpn3.hangocthanh.io.vn.key &amp;&amp; \
+  docker restart derp-relay</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">6</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Thêm relay node vào Admin-UI</h2>
+        <p>Sau khi relay node hoạt động, đăng ký vào hệ thống qua Admin-UI:</p>
+        <ol>
+          <li>Mở <code>https://vpn2.hangocthanh.io.vn/app/</code></li>
+          <li>Đăng nhập với Google account</li>
+          <li>Vào <strong>DERP Regions → Add Region</strong></li>
+          <li>Điền thông tin:</li>
+        </ol>
+        <pre><code>Hostname:    vpn3.hangocthanh.io.vn
+IP Address:  64.176.23.196
+DERP Port:   443
+STUN Port:   3478
+Region Code: vpn3-vn
+Region Name: Vietnam - VPN3
+Priority:    100
+Status:      Active</code></pre>
+        <ol start="5">
+          <li>Save → API tự động cập nhật <code>derpmap.json</code></li>
+          <li>Headscale pull derpmap mỗi 10s → client nhận DERPMap mới</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">7</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Cập nhật DERP probe URLs cho latency monitor</h2>
+        <p>Secret <code>DERP_PROBE_URLS</code> chứa danh sách các relay node để <code>latency</code> module monitor:</p>
+        <pre><code># Format: "region-code=probe-url,region-code=probe-url,..."
+gh secret set DERP_PROBE_URLS --body "vpn2-vn=https://vpn2.hangocthanh.io.vn/derp/probe,vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe,vpn4-vn=https://vpn4.hangocthanh.io.vn/derp/probe"</code></pre>
+        <p>Re-deploy latency module để nhận cấu hình mới:</p>
+        <pre><code>gh workflow run module-latency.yml</code></pre>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-num">8</div>
+      <div class="step-body">
+        <h2 style="margin-top:0">Kiểm tra relay node hoạt động</h2>
+
+        <h3>8.1 Probe endpoint</h3>
+        <pre><code># Từ máy bất kỳ có internet:
+curl -v https://vpn3.hangocthanh.io.vn/derp/probe
+# → HTTP 200 OK
+# Body: "ok" hoặc JSON status</code></pre>
+
+        <h3>8.2 DERP WebSocket test</h3>
+        <pre><code># Cài tailscale trên máy test rồi:
+tailscale ping &lt;peer_ip&gt; --until-direct=false
+# → pong via vpn3.hangocthanh.io.vn:443  (chứng tỏ relay đang dùng)</code></pre>
+
+        <h3>8.3 Logs container</h3>
+        <pre><code>ssh root@64.176.23.196
+cd /opt/tailscale-remote/deploy/relay
+docker compose logs -f derp-relay
+
+# Log bình thường trông như:
+# derper: 2026/06/21 10:00:00 DERP server
+# derper: 2026/06/21 10:00:01 Accepting connection from 1.2.3.4:52345
+# reporter: Sent latency report to collector: 12.3ms</code></pre>
+
+        <h3>8.4 STUN test</h3>
+        <pre><code># Dùng stun-client hoặc nc:
+nc -u vpn3.hangocthanh.io.vn 3478
+# Hoặc dùng Admin-UI → DERP Regions → row vpn3 → click "Probe Health"</code></pre>
+      </div>
+    </div>
+
+    <hr>
+
+    <h2>Troubleshooting relay node</h2>
+
+    <h3>DERP probe trả lỗi hoặc timeout</h3>
+    <pre><code># Kiểm tra container chạy không:
+docker compose ps
+
+# Kiểm tra port 8080 (derper HTTP):
+ss -tulpn | grep 8080
+
+# Kiểm tra Caddy có route không:
+curl -v http://localhost:8080/derp/probe</code></pre>
+    <table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>connection refused :443</code></td><td>Caddy không chạy</td><td><code>systemctl restart caddy</code></td></tr>
+        <tr><td><code>certificate invalid</code></td><td>Cert chưa issue hoặc expired</td><td>Kiểm tra <code>certbot certificates</code></td></tr>
+        <tr><td><code>connection refused :8080</code></td><td>derper container chưa chạy</td><td><code>docker compose up -d</code></td></tr>
+        <tr><td><code>failed to get cert</code></td><td>Domain chưa trỏ về IP</td><td>Kiểm tra DNS: <code>dig vpn3.hangocthanh.io.vn</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>ping-reporter không gửi được về collector</h3>
+    <pre><code># Xem log reporter trong container:
+docker exec derp-relay cat /var/log/reporter.log
+# hoặc:
+docker compose logs derp-relay | grep reporter</code></pre>
+    <table>
+      <thead><tr><th>Triệu chứng</th><th>Nguyên nhân</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td><code>tailscale not connected</code></td><td>Container chưa join tailnet</td><td>Kiểm tra TS_AUTHKEY trong .env</td></tr>
+        <tr><td><code>connection refused collector:8090</code></td><td>collector-sidecar trên vpn2 không chạy</td><td>Kiểm tra vpn2 collector-sidecar status</td></tr>
+        <tr><td><code>no route to host</code></td><td>Tailnet chưa ổn định</td><td><code>docker exec derp-relay tailscale status</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Container exit ngay lập tức</h3>
+    <pre><code>docker compose logs derp-relay --tail=20 --no-log-prefix</code></pre>
+    <div class="warn">Thường do biến môi trường thiếu. Kiểm tra <code>.env</code> đủ <code>DERP_HOSTNAME</code>, <code>TS_AUTHKEY</code>, <code>COLLECTOR_URL</code>.</div>
+
+    <hr>
+
+    <h2>Server migration — chuyển relay sang VPS mới</h2>
+    <pre><code># 1. Trên VPS mới: cài Docker, Caddy, cấu hình y chang VPS cũ
+
+# 2. Cập nhật DNS domain về IP mới
+# (cert Let's Encrypt sẽ tự issue lại với IP mới)
+
+# 3. Deploy:
+gh secret set VPN3_HOST --body "NEW_IP"
+gh workflow run module-derp-relay.yml
+
+# 4. Kiểm tra:
+curl https://vpn3.hangocthanh.io.vn/derp/probe
+# → 200 OK
+
+# 5. Update IP trong Admin-UI DERP Regions
+# vpn3 → Edit → IP Address: NEW_IP
+
+# 6. VPS cũ: stop container
+ssh root@OLD_IP "docker compose -f /opt/tailscale-remote/deploy/relay/docker-compose.yml down"</code></pre>
+  </main>
+</body>
+</html>
