@@ -1,27 +1,29 @@
-# High Availability — Control Plane (vpn2 + vpn6)
+# High Availability + Load Balancing — Control Plane (vpn2 + vpn6)
 
 ---
 
 ## Tổng quan
 
-Control plane (derp-controller + api-center + admin-ui) chạy trên **cả vpn2 và vpn6** (cả hai luôn running). Cloudflare dùng **Failover Priority** — vpn2 nhận 100% traffic bình thường, vpn6 chỉ được activate khi vpn2 fail health check.
+Control plane (derp-controller + api-center + admin-ui) chạy **đồng thời trên cả vpn2 và vpn6**. Cloudflare DNS LB dùng **Round Robin** — cả 2 node cùng nhận traffic, đồng thời cung cấp cả LB lẫn HA:
 
-> **Không phải Round Robin / Load Balancing.** headscale không hỗ trợ active-active (2 instance đồng thời nhận write). Cấu hình đúng là **active-passive failover**.
+- **Load Balancing**: request được phân phối đều giữa vpn2 và vpn6
+- **High Availability**: nếu 1 node fail health check, Cloudflare tự loại khỏi pool, node còn lại nhận 100% traffic
 
 ```
 Internet / Tailscale Clients
          │
          ▼
-☁️ Cloudflare DNS Failover
+☁️ Cloudflare DNS LB — Round Robin
    vpn2.hangocthanh.io.vn
+         │
+    ┌────┴────┐
+    ▼         ▼
+  vpn2      vpn6
+  ~50%      ~50%    ← cả 2 đều nhận traffic đồng thời
 
-   [BÌNH THƯỜNG]           [VPN2 DOWN]
-   100% → vpn2             Cloudflare phát hiện /healthz fail
-   vpn6 warm standby       → tự route 100% sang vpn6
-                           Khi vpn2 recover → route về vpn2
-
-vpn2 (PRIMARY — active)
-vpn6 (STANDBY — running nhưng chờ, không nhận traffic)
+  [Nếu 1 node fail /healthz]
+  → Cloudflare loại node đó khỏi pool
+  → node còn lại nhận 100% traffic tự động
 ```
 
 ---
@@ -89,18 +91,16 @@ Cùng Neon Postgres cho cả 2 node → api-center stateless, sessions lưu DB.
 
 ---
 
-## Cloudflare Failover Setup
+## Cloudflare Load Balancer Setup
 
 ```
 Cloudflare Dashboard → DNS → Load Balancing
 
-Pool PRIMARY (Priority 1):
-  Origin: 165.22.12.169 (vpn2)
+Pool: control-plane
+  Origin 1: 165.22.12.169 (vpn2)
+  Origin 2: 45.119.87.220 (vpn6)
 
-Pool STANDBY (Priority 2):
-  Origin: 45.119.87.220 (vpn6)
-
-Health check (áp dụng cho CẢ HAI pool):
+Health check:
   Type: HTTPS
   Path: /healthz
   Expected body: ok
@@ -111,11 +111,11 @@ Health check (áp dụng cho CẢ HAI pool):
 
 Load Balancer:
   Hostname: vpn2.hangocthanh.io.vn
-  Steering: Failover    ← KHÔNG phải Round Robin
-  Behavior: Route sang Priority 2 (vpn6) CHỈ KHI Priority 1 (vpn2) fail health check
+  Steering: Round Robin   ← cả 2 node cùng nhận traffic đồng thời
+  Failover: auto-remove failed origin
 ```
 
-> **Tại sao không Round Robin?** headscale duy trì WebSocket dài hạn với từng client để push netmap update. Nếu Round Robin route request tiếp theo sang instance khác, client phải reconnect và có thể gặp race condition khi 2 instance ghi Postgres đồng thời. Active-passive tránh hoàn toàn vấn đề này.
+> **Active-Active**: cả vpn2 và vpn6 đều nhận request đồng thời (~50/50). Điều kiện bắt buộc để active-active hoạt động đúng: cùng Neon Postgres DB, cùng noise_private.key, cùng SESSION_SECRET — đảm bảo mọi request đến node nào cũng có đủ state để xử lý.
 
 ---
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HA — Active-Passive Failover — TailscaleRemote Docs</title>
+  <title>HA + LB — Active-Active — TailscaleRemote Docs</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; background: #0b1220; color: #e2e8f0; display: flex; min-height: 100vh; }
@@ -237,15 +237,13 @@ echo "$HEADSCALE_NOISE_KEY" | base64 -d > ./headscale-keys/noise_private.key</co
     <p>Cùng Neon Postgres cho cả 2 node → api-center stateless, sessions lưu DB.</p>
   </div>
 
-  <h2>Cloudflare Failover Setup</h2>
-  <div class="warn">Không dùng <strong>Round Robin</strong> — headscale không hỗ trợ active-active. headscale duy trì WebSocket dài hạn với từng client; round-robin sẽ gây reconnect liên tục và có thể race condition khi 2 instance ghi Postgres đồng thời. Dùng <strong>Failover Priority</strong>: vpn2 nhận 100% traffic, vpn6 chỉ activate khi vpn2 fail.</div>
+  <h2>Cloudflare Load Balancer Setup</h2>
+  <div class="note"><strong>Active-Active</strong>: cả vpn2 và vpn6 đều nhận request đồng thời (~50/50 Round Robin). Điều kiện bắt buộc: cùng Neon Postgres DB, cùng noise_private.key, cùng SESSION_SECRET — mọi request đến node nào cũng có đủ state để xử lý.</div>
   <pre><code>Cloudflare Dashboard → DNS → Load Balancing
 
-Pool PRIMARY (Priority 1):
-  Origin: 165.22.12.169 (vpn2)
-
-Pool STANDBY (Priority 2):
-  Origin: 45.119.87.220 (vpn6)
+Pool: control-plane
+  Origin 1: 165.22.12.169 (vpn2)
+  Origin 2: 45.119.87.220 (vpn6)
 
   Origin 1: 165.22.12.169 (vpn2)
   Origin 2: 45.119.87.220 (vpn6)
@@ -261,8 +259,8 @@ Health check:
 
 Load Balancer:
   Hostname: vpn2.hangocthanh.io.vn
-  Steering: Failover    ← KHÔNG phải Round Robin
-  Behavior: Route sang Priority 2 (vpn6) CHỈ KHI Priority 1 (vpn2) fail health check</code></pre>
+  Steering: Round Robin   ← cả 2 node cùng nhận traffic đồng thời
+  Failover: auto-remove failed origin</code></pre>
 
   <h2>vpn6 Caddy Snippet</h2>
   <p>File <code>deploy/vpn6/caddy-snippet.conf</code> được thêm vào Caddyfile hệ thống của vpn6.</p>
