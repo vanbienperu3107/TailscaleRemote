@@ -13,16 +13,20 @@ import (
 )
 
 type Manager struct {
-	exe      string // path to tailscaled.exe
-	stateDir string
+	exe       string // path to tailscaled.exe
+	stateDir  string
 	socksAddr string // e.g. "127.0.0.1:7654"
+	logsDir   string
+	baseDir   string
 }
 
-func New(baseDir, socksAddr string) *Manager {
+func New(baseDir, socksAddr, logsDir string) *Manager {
 	return &Manager{
 		exe:       filepath.Join(baseDir, "tailscaled.exe"),
 		stateDir:  filepath.Join(baseDir, "state"),
 		socksAddr: socksAddr,
+		logsDir:   logsDir,
+		baseDir:   baseDir,
 	}
 }
 
@@ -47,6 +51,11 @@ func (m *Manager) Run(ctx context.Context) {
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
+		proxyConfPath := filepath.Join(m.baseDir, "proxy.conf")
+		cmd.Env = append(os.Environ(),
+			"TS_PROXY_CONF="+proxyConfPath,
+			"TS_LOGS_DIR="+m.logsDir,
+		)
 
 		log.Printf("[daemon] starting tailscaled (socks5=%s state=%s)", m.socksAddr, m.stateDir)
 		if err := cmd.Run(); err != nil {

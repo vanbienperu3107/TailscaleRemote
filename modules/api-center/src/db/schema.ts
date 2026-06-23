@@ -125,6 +125,8 @@ export const clientNetcheck = pgTable('client_netcheck', {
   client:        text('client').primaryKey(),
   preferredDerp: text('preferred_derp'),
   regionLatency: text('region_latency'), // JSON string: {regionCode: ms}
+  portSocks5:    integer('port_socks5'),
+  portHttp:      integer('port_http'),
   reportedAt:    timestamp('reported_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

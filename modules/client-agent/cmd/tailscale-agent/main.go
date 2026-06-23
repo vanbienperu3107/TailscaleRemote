@@ -20,9 +20,11 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -31,6 +33,7 @@ import (
 	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/daemon"
 	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/gostctl"
 	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/metrics"
+	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/proxyconf"
 	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/role"
 	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/tsctl"
 	"github.com/vanbienperu3107/TailscaleRemote/client-agent/internal/winproxy"
@@ -52,6 +55,15 @@ func main() {
 	exe, _ := os.Executable()
 	baseDir := filepath.Dir(exe)
 
+	// Apply upstream proxy from proxy.conf before any network calls.
+	if err := proxyconf.Apply(baseDir); err != nil {
+		log.Printf("[main] proxy.conf: %v", err)
+	}
+	logsDir := filepath.Join(baseDir, "logs")
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		log.Printf("[main] logs dir: %v", err)
+	}
+
 	log.SetFlags(log.LstdFlags)
 	log.Printf("tailscale-agent starting (server=%s socks=%s)", *serverURL, *socksAddr)
 
@@ -59,7 +71,7 @@ func main() {
 	defer cancel()
 
 	// ── 1. Start tailscaled.exe ──────────────────────────────────────────────
-	dmgr := daemon.New(baseDir, *socksAddr)
+	dmgr := daemon.New(baseDir, *socksAddr, logsDir)
 	go dmgr.Run(ctx)
 
 	// Give tailscaled a moment to bind the socket.
@@ -99,11 +111,22 @@ func main() {
 	gc := gostctl.New(gostExe)
 	gc.Apply(currentRole, initialCfg, *socksAddr)
 
-	// ── 7. Metrics reporter ───────────────────────────────────────────────────
+	// ── 7. Report active ports (once at startup) ─────────────────────────────
+	_, socksPortStr, _ := net.SplitHostPort(*socksAddr)
+	socksPort, _ := strconv.Atoi(socksPortStr)
+	httpPort := 0
+	if gostctl.GostEnabled(initialCfg.ProxyRank) || initialCfg.GostFallback {
+		httpPort = initialCfg.GostListenPort
+	}
+
+	// ── 8. Metrics reporter ───────────────────────────────────────────────────
 	reporter := metrics.New(*serverURL, *secret, ts.Status, ts.Ping, initialCfg.MetricsInterval)
+	if err := reporter.ReportActivePorts(ctx, socksPort, httpPort); err != nil {
+		log.Printf("[main] active_ports report: %v", err)
+	}
 	go reporter.Run(ctx)
 
-	// ── 8. Config poller ──────────────────────────────────────────────────────
+	// ── 9. Config poller ──────────────────────────────────────────────────────
 	go config.RunPoller(ctx, *serverURL, *configInterval, func(c config.Change) {
 		newRole := role.Detect(c.New.ItopLanPrefix)
 

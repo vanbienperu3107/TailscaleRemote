@@ -209,6 +209,8 @@ export async function devicesPublicRoutes(app: FastifyInstance): Promise<void> {
         gost_listen_port: parseInt(m.gost_listen_port ?? '18888', 10),
         gost_itop_port:   parseInt(m.gost_itop_port   ?? '18080', 10),
         gost_itop_addr:   m.gost_itop_addr    ?? '',
+        squid_proxy_addr: m.squid_proxy_addr ?? '',
+        squid_proxy_port: parseInt(m.squid_proxy_port ?? '3128', 10) || 3128,
       }
     } catch (e) {
       return reply.code(502).send({ error: String(e) })
@@ -240,7 +242,7 @@ export async function devicesPublicRoutes(app: FastifyInstance): Promise<void> {
 
       // Build proxy chain from proxy_rank (DB-controlled, admin-configurable).
       const rankStr = m.proxy_rank ?? 'socks5:7654'
-      const proxyStr = rankStr.split(',')
+      let proxyStr = rankStr.split(',')
         .map((s) => s.trim())
         .filter(Boolean)
         .map((entry) => {
@@ -254,6 +256,13 @@ export async function devicesPublicRoutes(app: FastifyInstance): Promise<void> {
         })
         .filter((e): e is string => e !== null && proxyEntryRe.test(e))
         .join('; ') || 'SOCKS5 127.0.0.1:7654'
+
+      // Append remote Squid proxy if configured — admin sets in DB, validated before embed.
+      const squidAddr = (m.squid_proxy_addr ?? '').trim()
+      const squidPort = parseInt(m.squid_proxy_port ?? '3128', 10) || 3128
+      if (squidAddr && ipRe.test(squidAddr) && squidPort > 0 && squidPort <= 65535) {
+        proxyStr += `; PROXY ${squidAddr}:${squidPort}`
+      }
 
       const allSubnets = [
         m.lan_routes ?? '10.0.0.0/8',

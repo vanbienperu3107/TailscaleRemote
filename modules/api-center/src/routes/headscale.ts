@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { sql } from 'drizzle-orm'
 import { requireAuth } from '../auth/middleware.js'
 import { db } from '../db/client.js'
-import { latencySamples } from '../db/schema.js'
+import { clientNetcheck, latencySamples } from '../db/schema.js'
 import { env } from '../env.js'
 import { hsApi, isHsConfigured } from '../lib/headscale.js'
 
@@ -20,6 +20,7 @@ type MetricsBody = {
   ipv4?: unknown
   mac?: unknown
   samples?: unknown
+  active_ports?: { socks5?: number; http?: number }
 }
 
 /** Public — không cần auth. Nhận báo cáo từ metrics-report.ps1 trên các client. */
@@ -32,6 +33,31 @@ export async function headscalePublicRoutes(app: FastifyInstance): Promise<void>
 
     const body = req.body as MetricsBody
     const srcHostname = String(body.hostname ?? '').toLowerCase().trim()
+
+    // Upsert active_ports into clientNetcheck when reported at startup.
+    const ap = (body as { active_ports?: { socks5?: number; http?: number } })?.active_ports
+    if (ap && srcHostname) {
+      try {
+        await db
+          .insert(clientNetcheck)
+          .values({
+            client:     srcHostname,
+            portSocks5: typeof ap.socks5 === 'number' ? ap.socks5 : null,
+            portHttp:   typeof ap.http   === 'number' ? ap.http   : null,
+          })
+          .onConflictDoUpdate({
+            target: [clientNetcheck.client],
+            set: {
+              portSocks5: sql`EXCLUDED.port_socks5`,
+              portHttp:   sql`EXCLUDED.port_http`,
+              reportedAt: sql`now()`,
+            },
+          })
+      } catch (e) {
+        app.log.warn({ err: e }, 'active_ports upsert error')
+      }
+    }
+
     if (!srcHostname || !Array.isArray(body.samples)) {
       return reply.code(400).send({ error: 'hostname and samples[] required' })
     }

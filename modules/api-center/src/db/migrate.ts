@@ -155,6 +155,13 @@ export async function migrate(): Promise<void> {
     )
   `)
 
+  // F1: active_ports columns on client_netcheck
+  await db.execute(sql`
+    ALTER TABLE client_netcheck
+      ADD COLUMN IF NOT EXISTS port_socks5 integer,
+      ADD COLUMN IF NOT EXISTS port_http   integer
+  `)
+
   // Tier 1: packet loss metric column
   await db.execute(sql`
     ALTER TABLE latency_samples ADD COLUMN IF NOT EXISTS loss_pct INTEGER
@@ -182,5 +189,13 @@ export async function migrate(): Promise<void> {
       ('gost_itop_port',    '18080',                   'Cong gost HTTP proxy tren may itop (server mode)'),
       ('gost_itop_addr',    '',                        'IP:port itop de votam chain (vi du: 100.64.0.1:18080), de trong = tu dong qua SOCKS5')
     ON CONFLICT DO NOTHING
+  `)
+
+  // F2: Squid proxy seed rows
+  await db.execute(sql`
+    INSERT INTO client_config (key, value, note) VALUES
+      ('squid_proxy_addr', '', 'Remote Squid HTTP proxy IP (e.g. 10.121.x.x). Empty = disabled.'),
+      ('squid_proxy_port', '3128', 'Remote Squid HTTP proxy port')
+    ON CONFLICT (key) DO NOTHING
   `)
 }

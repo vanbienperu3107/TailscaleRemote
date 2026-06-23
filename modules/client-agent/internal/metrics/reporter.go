@@ -10,6 +10,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -67,6 +68,23 @@ func (r *Reporter) Run(ctx context.Context) {
 			log.Printf("[metrics] report error: %v", err)
 		}
 	}
+}
+
+// ReportActivePorts sends a one-time startup POST reporting which local ports the agent is
+// listening on. socksPort is the Tailscale SOCKS5 port; httpPort is the gost HTTP port (0 if not running).
+func (r *Reporter) ReportActivePorts(ctx context.Context, socksPort, httpPort int) error {
+	selfHost, _ := os.Hostname()
+	ports := map[string]int{"socks5": socksPort}
+	if httpPort > 0 {
+		ports["http"] = httpPort
+	}
+	body, _ := json.Marshal(map[string]any{
+		"hostname":     selfHost,
+		"ipv4":         "",
+		"mac":          primaryMAC(),
+		"active_ports": ports,
+	})
+	return r.post(ctx, body)
 }
 
 type tsStatus struct {
