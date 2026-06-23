@@ -73,6 +73,7 @@ def test_dns_name_fallback():
     with _mock_status(status):
         peers, collector_ip = get_peers_and_collector()
     assert collector_ip == "100.64.0.1"
+    assert peers == []
 
 
 def test_no_ipv4_peer_skipped():

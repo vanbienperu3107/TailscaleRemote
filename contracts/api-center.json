@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Api-center public API contract — thay đổi ở đây trigger dependent module tests",
   "endpoints": {
     "derpmap": {
@@ -19,19 +19,55 @@
         "hostname": "string",
         "ipv4": "string",
         "mac": "string",
-        "samples": "array<{dst, rtt_ms, path, ok}>"
-      }
+        "samples": "array<{dst, rtt_ms, path, ok, loss_pct?}>"
+      },
+      "notes": "loss_pct: integer 0-100, nullable — packet loss percentage added v1.1"
     },
     "internal_derp_map": {
       "path": "/api/internal/derp-map/:nodeKey",
       "method": "GET",
       "consumers": ["derp-controller"],
       "auth": "X-Headscale-Secret header"
+    },
+    "metrics_derp_stats": {
+      "path": "/api/metrics/derp-stats",
+      "method": "GET",
+      "consumers": ["shadcn-admin"],
+      "auth": "none (public)",
+      "schema": {
+        "stats": "array<{region, avg_ms, min_ms, max_ms, samples, ok_rate, last_seen}>"
+      },
+      "notes": "DERP RTT aggregation per region, last 1 hour from latency_samples"
+    },
+    "client_config": {
+      "path": "/api/client/config",
+      "method": "GET",
+      "consumers": ["client-mod"],
+      "auth": "none (public)",
+      "schema": {
+        "lan_routes": "string (CIDR, e.g. '10.0.0.0/8')",
+        "itop_lan_prefix": "string (IP prefix, e.g. '10.121.')",
+        "pac_extra_subnets": "string (comma-separated CIDRs)",
+        "pac_extra_domains": "string (comma-separated domains)",
+        "gost_fallback": "boolean",
+        "metrics_interval": "integer (seconds)"
+      },
+      "notes": "Centralized config from client_config table — client fetches on startup to override local BAT values"
+    },
+    "client_proxy_pac": {
+      "path": "/api/client/proxy.pac",
+      "method": "GET",
+      "consumers": ["client-mod", "browser"],
+      "auth": "none (public)",
+      "content_type": "application/x-ns-proxy-autoconfig",
+      "notes": "Dynamic PAC file generated from client_config (lan_routes + pac_extra_subnets + pac_extra_domains). Browser points here instead of static .pac file. Admin changes take effect without modifying client files."
     }
   },
   "breaking_change_rules": [
     "derpmap schema change → must test derp-controller integration",
     "metrics_report schema change → must test client-mod + derp-relay",
-    "internal_derp_map change → must test derp-controller Feature B"
+    "internal_derp_map change → must test derp-controller Feature B",
+    "client_config schema change → must test client-mod start-tailscale.bat fetch block",
+    "client_proxy_pac change → must validate browser PAC routing for 10.x + 172.x + 192.168.x"
   ]
 }

@@ -79,6 +79,7 @@ export const latencySamples = pgTable(
     rttMs:       real('rtt_ms'),
     path:        text('path'),          // 'direct' | 'derp:regionName'
     ok:          boolean('ok').notNull().default(true),
+    lossPct:     integer('loss_pct'),   // 0-100, null = not measured
     reportedAt:  timestamp('reported_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.srcHostname, t.dstHostname] })]
@@ -102,6 +103,38 @@ export const derpNodeAssignments = pgTable('derp_node_assignments', {
   regionId: integer('region_id').notNull().references(() => derpServers.regionId, { onDelete: 'cascade' }),
 }, (t) => [primaryKey({ columns: [t.nodeKey, t.regionId] })])
 
+/** Node dedup history: 1 dòng = 1 thiết bị thực (user, hostname). Ghi bởi latency module. */
+export const devices = pgTable(
+  'devices',
+  {
+    userName:   text('user_name').notNull(),
+    hostname:   text('hostname').notNull(),
+    mac:        text('mac'),
+    nodeId:     text('node_id'),
+    ipv4:       text('ipv4'),
+    machineKey: text('machine_key'),
+    firstSeen:  timestamp('first_seen', { withTimezone: true }).notNull().defaultNow(),
+    lastSeen:   timestamp('last_seen', { withTimezone: true }).notNull().defaultNow(),
+    seenCount:  integer('seen_count').notNull().default(1),
+  },
+  (t) => [primaryKey({ columns: [t.userName, t.hostname] })]
+)
+
+/** Tailscale netcheck kết quả từ client (latest per client, UPSERT). */
+export const clientNetcheck = pgTable('client_netcheck', {
+  client:        text('client').primaryKey(),
+  preferredDerp: text('preferred_derp'),
+  regionLatency: text('region_latency'), // JSON string: {regionCode: ms}
+  reportedAt:    timestamp('reported_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const clientConfig = pgTable('client_config', {
+  key:       text('key').primaryKey(),
+  value:     text('value').notNull(),
+  note:      text('note'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export type DerpServer = typeof derpServers.$inferSelect
 export type NewDerpServer = typeof derpServers.$inferInsert
 export type User = typeof users.$inferSelect
@@ -110,3 +143,6 @@ export type HeadscaleApiKey = typeof headscaleApiKey.$inferSelect
 export type LatencySample = typeof latencySamples.$inferSelect
 export type DerpForceRoute = typeof derpForceRoutes.$inferSelect
 export type DerpNodeAssignment = typeof derpNodeAssignments.$inferSelect
+export type Device = typeof devices.$inferSelect
+export type ClientNetcheck = typeof clientNetcheck.$inferSelect
+export type ClientConfig = typeof clientConfig.$inferSelect

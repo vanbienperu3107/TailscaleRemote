@@ -96,18 +96,19 @@ services:
     environment:
       - HS_API_URL=${HS_API_URL:-http://derp-controller:8080}
       - HS_API_KEY=${HEADSCALE_API_KEY}
+      - API_CENTER_URL=http://api-center:8787
       - POLL_INTERVAL=30
-      - DB_PATH=/data/devices.db
       - DRY_RUN=${DEDUP_DRY_RUN:-false}
       - AUTO_APPROVE_ROUTES=${AUTO_APPROVE_ROUTES:-true}
-      - METRICS_PORT=8090
       - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-      - DERP_PROBE_URLS=${DERP_PROBE_URLS:-}
+      - SRC_NAME=collector
     volumes:
-      - latency_data:/data
       - ts_sock:/var/run/tailscale
     depends_on:
-      - derp-controller
+      derp-controller:
+        condition: service_started
+      api-center:
+        condition: service_healthy
 
   collector-sidecar:
     image: ghcr.io/vanbienperu3107/collector-sidecar:latest
@@ -119,7 +120,8 @@ services:
       - TS_EXTRA_ARGS=${TS_EXTRA_ARGS}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-      - FORWARD_TARGET=latency:8090
+      # socat: port 8090 (tailnet) → api-center:8787 (Docker internal)
+      - FORWARD_TARGET=api-center:8787
       - FORWARD_PORT=8090
     volumes:
       - collector_state:/var/lib/tailscale
@@ -129,8 +131,10 @@ services:
     cap_add:
       - NET_ADMIN
     depends_on:
-      - derp-controller
-      - latency
+      derp-controller:
+        condition: service_started
+      api-center:
+        condition: service_healthy
 
   # ─── Gateway (TLS termination) ────────────────────────────────────────────────
   # Chỉ chạy trên vpn2 — vpn6 dùng Caddy sẵn có.
@@ -155,7 +159,6 @@ services:
 
 volumes:
   derp_relay_certs:
-  latency_data:
   collector_state:
   ts_sock:
   derp_controller_run:

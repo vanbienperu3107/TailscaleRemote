@@ -12,6 +12,7 @@ type MetricsSample = {
   rtt_ms?: unknown
   path?: unknown
   ok?: unknown
+  loss_pct?: unknown
 }
 
 type MetricsBody = {
@@ -35,7 +36,7 @@ export async function headscalePublicRoutes(app: FastifyInstance): Promise<void>
       return reply.code(400).send({ error: 'hostname and samples[] required' })
     }
 
-    const rows = (body.samples as MetricsSample[])
+    const rows = (body.samples as MetricsSample[]).slice(0, 1000)
       .filter((s) => s.dst)
       .map((s) => ({
         srcHostname,
@@ -44,27 +45,35 @@ export async function headscalePublicRoutes(app: FastifyInstance): Promise<void>
         mac: body.mac != null ? String(body.mac) : null,
         rttMs: typeof s.rtt_ms === 'number' ? s.rtt_ms : null,
         path: s.path != null ? String(s.path) : null,
-        ok: s.ok !== false,
+        ok:     s.ok === true,
+        lossPct: typeof s.loss_pct === 'number' && Number.isFinite(s.loss_pct as number)
+          ? Math.round(Math.max(0, Math.min(100, s.loss_pct as number)))
+          : null,
         reportedAt: new Date(),
       }))
       .filter((r) => r.dstHostname)
 
     if (rows.length === 0) return { ok: true, upserted: 0 }
 
-    await db
-      .insert(latencySamples)
-      .values(rows)
-      .onConflictDoUpdate({
-        target: [latencySamples.srcHostname, latencySamples.dstHostname],
-        set: {
-          srcIp:      sql`EXCLUDED.src_ip`,
-          mac:        sql`EXCLUDED.mac`,
-          rttMs:      sql`EXCLUDED.rtt_ms`,
-          path:       sql`EXCLUDED.path`,
-          ok:         sql`EXCLUDED.ok`,
-          reportedAt: sql`EXCLUDED.reported_at`,
-        },
-      })
+    try {
+      await db
+        .insert(latencySamples)
+        .values(rows)
+        .onConflictDoUpdate({
+          target: [latencySamples.srcHostname, latencySamples.dstHostname],
+          set: {
+            srcIp:      sql`EXCLUDED.src_ip`,
+            mac:        sql`EXCLUDED.mac`,
+            rttMs:      sql`EXCLUDED.rtt_ms`,
+            path:       sql`EXCLUDED.path`,
+            ok:         sql`EXCLUDED.ok`,
+            lossPct:    sql`EXCLUDED.loss_pct`,
+            reportedAt: sql`EXCLUDED.reported_at`,
+          },
+        })
+    } catch (e) {
+      return reply.code(502).send({ error: 'db error' })
+    }
 
     return { ok: true, upserted: rows.length }
   })

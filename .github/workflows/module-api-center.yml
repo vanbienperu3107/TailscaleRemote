@@ -33,7 +33,7 @@ jobs:
           cache-dependency-path: ${{ env.MODULE }}/package-lock.json
       - run: npm ci
       - run: npm run build
-      - run: npm test 2>/dev/null || npx vitest run
+      - run: npm test
 
   # ── 2. Contract diff check ────────────────────────────────────────────────────
   contract-check:
@@ -64,13 +64,14 @@ jobs:
     name: Build & push api-center image
     runs-on: ubuntu-latest
     needs: [test, contract-check]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'pull_request'
     permissions:
       contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
       - uses: docker/login-action@v3
+        if: github.event_name != 'pull_request'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -79,7 +80,8 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: ${{ env.MODULE }}
-          push: true
+          push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
 
   # ── 4. Deploy to vpn2 ────────────────────────────────────────────────────────
@@ -87,6 +89,7 @@ jobs:
     name: Deploy api-center to vpn2
     runs-on: ubuntu-latest
     needs: build
+    if: github.ref == 'refs/heads/main'
     continue-on-error: true
     environment: production
     steps:

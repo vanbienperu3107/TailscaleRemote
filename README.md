@@ -127,7 +127,24 @@ Internet
   - `/` → redirect `/app/`
 - **Không có business logic** — chỉ proxy
 
-### 8. Client Mod *(repo riêng)*
+### 8. Exit Node `modules/exit-node/`
+
+**Vai trò:** Chạy độc lập trên bất kỳ VPS nào, join tailnet như một client, quảng bá làm exit node cho toàn bộ thành viên.
+
+- Chỉ cần `docker compose up` với pre-auth key — tự join và tự advertise exit node
+- Route `0.0.0.0/0` + `::/0` tự động approve bởi `latency` module (`AUTO_APPROVE_ROUTES=true`)
+- Mỗi thành viên tự chọn dùng không (opt-in per device):
+
+```bash
+tailscale up --exit-node=exit-vpn2          # bật proxy qua exit node
+tailscale up --exit-node=                   # tắt
+```
+
+- **Image:** `ghcr.io/vanbienperu3107/exit-node:latest`
+- **Deploy:** `deploy/exit-node/docker-compose.yml` — độc lập, không phụ thuộc vpn2
+- **Có thể deploy nhiều exit node** trên nhiều server (VPS khác region, khác quốc gia)
+
+### 9. Client Mod *(repo riêng)*
 **Vai trò:** Tailscale fork tùy chỉnh cho Windows.
 
 - Kết nối tailnet qua DERP-Controller

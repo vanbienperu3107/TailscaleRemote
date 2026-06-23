@@ -16,6 +16,11 @@ const createSchema = z.object({
   active: z.boolean().default(true),
 })
 
+const patchSchema = z.object({
+  active: z.boolean().optional(),
+  label:  z.string().max(128).optional(),
+})
+
 export async function forceRouteRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', requireAuth)
 
@@ -57,14 +62,18 @@ export async function forceRouteRoutes(app: FastifyInstance): Promise<void> {
   /** Bật/tắt active. */
   app.patch<{ Params: { id: string } }>('/api/force-routes/:id', async (req, reply) => {
     const id = Number(req.params.id)
-    const body = req.body as { active?: boolean; label?: string }
+    if (!Number.isFinite(id) || id <= 0) {
+      return reply.code(400).send({ error: 'invalid_id' })
+    }
+    const parsed = patchSchema.safeParse(req.body)
+    if (!parsed.success) return reply.code(400).send({ error: 'invalid', details: parsed.error.flatten() })
     const [existing] = await db.select().from(derpForceRoutes).where(eq(derpForceRoutes.id, id))
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     const [row] = await db
       .update(derpForceRoutes)
       .set({
-        active: body.active ?? existing.active,
-        label:  body.label  ?? existing.label,
+        active: parsed.data.active ?? existing.active,
+        label:  parsed.data.label  ?? existing.label,
       })
       .where(eq(derpForceRoutes.id, id))
       .returning()
@@ -74,6 +83,9 @@ export async function forceRouteRoutes(app: FastifyInstance): Promise<void> {
   /** Xóa. */
   app.delete<{ Params: { id: string } }>('/api/force-routes/:id', async (req, reply) => {
     const id = Number(req.params.id)
+    if (!Number.isFinite(id) || id <= 0) {
+      return reply.code(400).send({ error: 'invalid_id' })
+    }
     const [existing] = await db.select().from(derpForceRoutes).where(eq(derpForceRoutes.id, id))
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     await db.delete(derpForceRoutes).where(eq(derpForceRoutes.id, id))

@@ -35,7 +35,7 @@ jobs:
       # Ghi .env từ secrets
       - name: Write .env
         run: |
-          cat > /tmp/vpn2.env << 'ENVEOF'
+          cat > /tmp/.env << 'ENVEOF'
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           DOMAIN=${{ secrets.CONTROL_DOMAIN }}
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
@@ -55,7 +55,6 @@ jobs:
           TS_EXTRA_ARGS=--login-server=https://${{ secrets.CONTROL_DOMAIN }} --hostname=collector --accept-dns=false
           DEDUP_DRY_RUN=false
           AUTO_APPROVE_ROUTES=true
-          DERP_PROBE_URLS=${{ secrets.DERP_PROBE_URLS }}
           ENVEOF
 
       # Ghi noise_private.key từ secret (base64-encoded)
@@ -81,8 +80,8 @@ jobs:
           host: ${{ secrets.VPN2_HOST }}
           username: ${{ secrets.VPN2_USER }}
           key: ${{ secrets.VPN2_SSH_KEY }}
-          source: "/tmp/vpn2.env"
-          target: /opt/tailscale-remote/deploy/vpn2/.env
+          source: "/tmp/.env"
+          target: /opt/tailscale-remote/deploy/vpn2/
           strip_components: 1
 
       - uses: appleboy/scp-action@v0.1.7
@@ -91,7 +90,7 @@ jobs:
           username: ${{ secrets.VPN2_USER }}
           key: ${{ secrets.VPN2_SSH_KEY }}
           source: "/tmp/headscale-keys/noise_private.key"
-          target: /opt/tailscale-remote/deploy/vpn2/headscale-keys/noise_private.key
+          target: /opt/tailscale-remote/deploy/vpn2/
           strip_components: 1
 
       # Deploy và health check vpn2
@@ -142,8 +141,9 @@ jobs:
 
       - name: Write .env for vpn6
         run: |
-          cat > /tmp/vpn6.env << 'ENVEOF'
+          cat > /tmp/.env << 'ENVEOF'
           DATABASE_URL=${{ secrets.DATABASE_URL }}
+          DOMAIN=${{ secrets.CONTROL_DOMAIN }}
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
           SESSION_SECRET=${{ secrets.SESSION_SECRET }}
@@ -177,8 +177,8 @@ jobs:
           host: ${{ secrets.VPN6_HOST }}
           username: ${{ secrets.VPN6_USER }}
           key: ${{ secrets.VPN6_SSH_KEY }}
-          source: "/tmp/vpn6.env"
-          target: /opt/tailscale-remote/deploy/vpn6/.env
+          source: "/tmp/.env"
+          target: /opt/tailscale-remote/deploy/vpn6/
           strip_components: 1
 
       - uses: appleboy/scp-action@v0.1.7
@@ -187,7 +187,7 @@ jobs:
           username: ${{ secrets.VPN6_USER }}
           key: ${{ secrets.VPN6_SSH_KEY }}
           source: "/tmp/headscale-keys/noise_private.key"
-          target: /opt/tailscale-remote/deploy/vpn6/headscale-keys/noise_private.key
+          target: /opt/tailscale-remote/deploy/vpn6/
           strip_components: 1
 
       - uses: appleboy/ssh-action@v1

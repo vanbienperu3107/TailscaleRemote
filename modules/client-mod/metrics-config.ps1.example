@@ -1,0 +1,22 @@
+# metrics-config.ps1 - Override cau hinh metrics-report.ps1
+# Sao chep file nay thanh 'metrics-config.ps1' va sua cac gia tri can thiet.
+# File nay duoc dot-sourced tu dong boi metrics-report.ps1.
+
+# URL dashboard (khong co dau /)
+$DashboardUrl  = 'https://dashboard.hangocthanh.io.vn'
+
+# Shared secret (khop voi METRICS_SHARED_SECRET tren server). De trong = khong kiem tra.
+$MetricsSecret = ''
+
+# Thoi gian giua cac lan bao cao (giay)
+$Interval      = 60
+
+# So lan ping moi peer
+$PingCount     = 2
+
+# Timeout moi lan ping
+$PingTimeout   = '3s'
+
+# Ghi log ra file (de trong = chi in ra console)
+# $LogFile = 'C:\ProgramData\TailscaleMetrics\metrics.log'
+$LogFile       = ''

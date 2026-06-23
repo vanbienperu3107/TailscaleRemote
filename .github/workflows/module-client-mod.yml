@@ -1,0 +1,89 @@
+name: 'Module: client-mod'
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'modules/client-mod/**'
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'modules/client-mod/**'
+      - 'contracts/**'
+  workflow_dispatch:
+
+env:
+  MODULE: modules/client-mod
+
+jobs:
+  # ── 1. Self-test + syntax ────────────────────────────────────────────────────
+  test:
+    name: Validate metrics-report.ps1
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check (PSParser)
+        shell: pwsh
+        run: |
+          $errors = $null
+          $tokens = $null
+          $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            "$env:GITHUB_WORKSPACE/${{ env.MODULE }}/metrics-report.ps1",
+            [ref]$tokens, [ref]$errors
+          )
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+          Write-Host "Syntax OK"
+
+      - name: Self-test (Parse-Ping + SelfTest)
+        shell: pwsh
+        run: |
+          & "$env:GITHUB_WORKSPACE/${{ env.MODULE }}/metrics-report.ps1" -SelfTest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  # ── 2. Contract check ────────────────────────────────────────────────────────
+  contract-check:
+    name: Check metrics/report contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verify payload fields present in metrics-report.ps1
+        run: |
+          SCRIPT="${{ env.MODULE }}/metrics-report.ps1"
+          ok=true
+          for field in hostname ipv4 mac samples dst rtt_ms path; do
+            if ! grep -q "\"$field\"" "$SCRIPT" 2>/dev/null && ! grep -qi "\$$field\|= @(" "$SCRIPT" 2>/dev/null; then
+              echo "::warning::field '$field' not found in $SCRIPT — check contract"
+            fi
+          done
+
+          # Strict check: core payload fields
+          grep -qE '"hostname"|hostname\s*=' "$SCRIPT" || { echo "::error::missing hostname field"; ok=false; }
+          grep -qE '"samples"|samples\s*='  "$SCRIPT" || { echo "::error::missing samples field";  ok=false; }
+          grep -qE '"mac"|mac\s*='          "$SCRIPT" || { echo "::error::missing mac field";       ok=false; }
+          grep -qE '"dst"|dst\s*='          "$SCRIPT" || { echo "::error::missing dst field";       ok=false; }
+          grep -qE '"ok"|ok\s*='            "$SCRIPT" || { echo "::error::missing ok field";        ok=false; }
+          $ok || exit 1
+          echo "Contract fields OK"
+
+      - name: Warn on api-center contract change
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q "^contracts/api-center"; then
+            echo "::warning::api-center contract changed — re-validate metrics-report.ps1 POST payload"
+          fi
+
+      - name: Verify login-server target is self-hosted (not Tailscale Inc)
+        run: |
+          SCRIPT="${{ env.MODULE }}/start-tailscale.bat"
+          if grep -qi "controlplane.tailscale.com\|login.tailscale.com" "$SCRIPT"; then
+            echo "::error::start-tailscale.bat points to Tailscale Inc instead of self-hosted headscale"
+            exit 1
+          fi
+          grep -q "HS_SERVER" "$SCRIPT" || { echo "::error::HS_SERVER not defined"; exit 1; }
+          echo "Self-host target OK"

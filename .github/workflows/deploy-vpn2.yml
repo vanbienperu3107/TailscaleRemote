@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Write .env
         run: |
-          cat > /tmp/vpn2.env <<EOF
+          cat > /tmp/.env <<'ENVEOF'
           DATABASE_URL=${{ secrets.DATABASE_URL }}
           GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
@@ -33,10 +33,17 @@ jobs:
           ALLOWED_EMAILS=${{ secrets.ALLOWED_EMAILS }}
           HEADSCALE_API_KEY=${{ secrets.HEADSCALE_API_KEY }}
           HEADSCALE_DASHBOARD_SECRET=${{ secrets.HEADSCALE_DASHBOARD_SECRET }}
+          DOMAIN=${{ secrets.CONTROL_DOMAIN }}
+          PUBLIC_URL=https://${{ secrets.CONTROL_DOMAIN }}
+          HS_DB_HOST=${{ secrets.HS_DB_HOST }}
+          HS_DB_NAME=${{ secrets.HS_DB_NAME }}
+          HS_DB_USER=${{ secrets.HS_DB_USER }}
+          HS_DB_PASS=${{ secrets.HS_DB_PASS }}
           TS_AUTHKEY=${{ secrets.TS_AUTHKEY }}
+          TS_EXTRA_ARGS=--login-server=https://${{ secrets.CONTROL_DOMAIN }} --hostname=collector --accept-dns=false
           DEDUP_DRY_RUN=false
           AUTO_APPROVE_ROUTES=true
-          EOF
+          ENVEOF
       - uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPN2_HOST }}
@@ -50,8 +57,8 @@ jobs:
           host: ${{ secrets.VPN2_HOST }}
           username: ${{ secrets.VPN2_USER }}
           key: ${{ secrets.VPN2_SSH_KEY }}
-          source: "/tmp/vpn2.env"
-          target: /opt/tailscale-remote/deploy/vpn2/.env
+          source: "/tmp/.env"
+          target: /opt/tailscale-remote/deploy/vpn2/
           strip_components: 1
       - uses: appleboy/ssh-action@v1
         with:
@@ -59,6 +66,7 @@ jobs:
           username: ${{ secrets.VPN2_USER }}
           key: ${{ secrets.VPN2_SSH_KEY }}
           script: |
+            set -e
             cd /opt/tailscale-remote/deploy/vpn2
             docker compose pull
             docker compose up -d --remove-orphans

@@ -20,9 +20,22 @@ import time
 
 TS_SOCKET = os.environ.get("TS_SOCKET", "/var/run/tailscale/tailscaled.sock")
 REPORTER_NAME = os.environ.get("REPORTER_NAME", "vpn3")
-COLLECTOR_PORT = int(os.environ.get("COLLECTOR_PORT", "8090"))
-POLL_INTERVAL = int(os.environ.get("POLL_INTERVAL", "30"))
-PING_TIMEOUT = int(os.environ.get("PING_TIMEOUT", "8"))
+
+
+def _env_int(key, default):
+    try:
+        return int(os.environ.get(key, str(default)))
+    except ValueError:
+        return default
+
+
+COLLECTOR_PORT = _env_int("COLLECTOR_PORT", 8090)
+POLL_INTERVAL = _env_int("POLL_INTERVAL", 30)
+PING_TIMEOUT = _env_int("PING_TIMEOUT", 8)
+CIRCUIT_THRESHOLD  = _env_int("CIRCUIT_THRESHOLD", 5)   # consecutive fails before open circuit
+CIRCUIT_SKIP_LOOPS = _env_int("CIRCUIT_SKIP_LOOPS", 3)  # loops to skip when circuit is open
+MAX_INTERVAL       = POLL_INTERVAL * 3                   # adaptive ceiling
+MIN_INTERVAL       = max(POLL_INTERVAL // 3, 10)         # adaptive floor
 
 COLLECTOR_HOSTNAME = "collector"   # ten headscale node cua vpn2
 
@@ -44,15 +57,19 @@ class _UnixHTTP(http.client.HTTPConnection):
 
 
 def _localapi(method, path, timeout=10):
+    conn = None
     try:
         conn = _UnixHTTP(TS_SOCKET, timeout)
-        conn.request(method, path)
+        headers = {"Content-Length": "0"} if method == "POST" else {}
+        conn.request(method, path, headers=headers)
         resp = conn.getresponse()
         body = resp.read()
-        conn.close()
         return json.loads(body or b"{}") if resp.status == 200 else None
     except Exception:
         return None
+    finally:
+        if conn:
+            conn.close()
 
 
 def get_peers_and_collector():
@@ -71,6 +88,8 @@ def get_peers_and_collector():
         if not ip4:
             continue
         host = (peer.get("HostName") or (peer.get("DNSName") or "").split(".")[0]).lower()
+        if not host:
+            continue
         online = bool(peer.get("Online"))
         if host == COLLECTOR_HOSTNAME:
             # Sau deploy co the ton tai 2 node 'collector' (ban cu OFFLINE + ban moi
@@ -108,31 +127,41 @@ def ping_peer(ip4):
 
 
 def post_to_collector(collector_ip, samples):
-    """POST samples len collector:COLLECTOR_PORT/metrics/report. True neu 200."""
+    """POST samples len collector:COLLECTOR_PORT/metrics/report. True neu 200/201."""
     payload = json.dumps({
         "hostname": REPORTER_NAME,
         "ipv4": "",
         "mac": "",
         "samples": samples,
     }).encode()
+    conn = None
     try:
         conn = http.client.HTTPConnection(collector_ip, COLLECTOR_PORT, timeout=10)
-        conn.request("POST", "/metrics/report", body=payload,
+        conn.request("POST", "/api/metrics/report", body=payload,
                      headers={"Content-Type": "application/json",
                                "Content-Length": str(len(payload))})
         resp = conn.getresponse()
         resp.read()
-        conn.close()
-        return resp.status == 200
+        return resp.status in (200, 201)
     except Exception as e:
         log("POST collector ERR:", repr(e))
         return False
+    finally:
+        if conn:
+            conn.close()
 
 
 def main():
     log("ping-reporter [%s] start socket=%s poll=%ss" % (
         REPORTER_NAME, TS_SOCKET, POLL_INTERVAL))
+
+    fail_streak  = {}   # ip4 -> consecutive failure count
+    skip_until   = {}   # ip4 -> loop index when circuit opens back up
+    interval     = float(POLL_INTERVAL)
+    loop_idx     = 0
+
     while True:
+        loop_idx += 1
         try:
             peers, collector_ip = get_peers_and_collector()
             if not collector_ip:
@@ -142,19 +171,46 @@ def main():
             else:
                 samples = []
                 for host, ip4 in peers:
+                    # Circuit breaker: bo qua peer dang bi open circuit
+                    if skip_until.get(ip4, 0) > loop_idx:
+                        continue
+
                     r = ping_peer(ip4)
                     samples.append({
-                        "dst": host, "dst_ip": ip4,
+                        "dst":    host, "dst_ip": ip4,
                         "rtt_ms": r["rtt_ms"], "path": r["path"], "ok": r["ok"],
                     })
-                ok = post_to_collector(collector_ip, samples)
-                up = sum(1 for s in samples if s["ok"])
-                log("[%s] ping %d/%d OK -> collector %s: %s" % (
-                    REPORTER_NAME, up, len(samples), collector_ip,
-                    "OK" if ok else "FAIL"))
+
+                    if r["ok"]:
+                        fail_streak[ip4] = 0
+                    else:
+                        fail_streak[ip4] = fail_streak.get(ip4, 0) + 1
+                        if fail_streak[ip4] >= CIRCUIT_THRESHOLD:
+                            skip_until[ip4] = loop_idx + CIRCUIT_SKIP_LOOPS
+                            log("circuit-open: %s (%s) skip %d loops" % (
+                                host, ip4, CIRCUIT_SKIP_LOOPS))
+                            fail_streak[ip4] = 0
+
+                if samples:
+                    ok = post_to_collector(collector_ip, samples)
+                    up = sum(1 for s in samples if s["ok"])
+                    log("[%s] ping %d/%d OK -> collector %s: %s interval=%.0fs" % (
+                        REPORTER_NAME, up, len(samples), collector_ip,
+                        "OK" if ok else "FAIL", interval))
+
+                    # Adaptive interval: on >= 90% ok rate -> slow down; on < 50% -> speed up
+                    ok_rate = up / len(samples)
+                    if ok_rate >= 0.9:
+                        interval = min(interval * 1.1, MAX_INTERVAL)
+                    elif ok_rate < 0.5:
+                        interval = max(interval * 0.6, MIN_INTERVAL)
+                    else:
+                        interval = POLL_INTERVAL
+
         except Exception as e:
             log("ERR:", repr(e))
-        time.sleep(POLL_INTERVAL)
+
+        time.sleep(int(interval))
 
 
 if __name__ == "__main__":

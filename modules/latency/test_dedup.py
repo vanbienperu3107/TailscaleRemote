@@ -1,36 +1,27 @@
-"""Unit test cho logic dedup + collector (chay trong CI truoc khi deploy)."""
-import sqlite3
-import time
-from unittest.mock import MagicMock, patch
+"""Unit test cho logic dedup + server-ping + api-center reporting (chay trong CI)."""
+from unittest.mock import call, patch
 
 import pytest
 
-import json
-
-from dedup import (aggregate_latency, init_db, init_latency_db,
-                   is_allowed_report_src, is_tailnet_ip,
-                   latency_series, normalize, parse_pingresult,
-                   peer_relay_from_status, pingable_nodes, plan_actions,
-                   plan_route_approvals,
-                   probe_derp_region, query_all_server_pings, query_current_relay,
-                   query_devices, query_latest_netcheck, record_netcheck, record_report,
-                   render_derp_html, render_stats_html,
-                   server_ping_all, stale_reporters, validate_report, _parse_derp_regions,
-                   DERP_PROBE_URLS)
+from dedup import (normalize, parse_pingresult, pingable_nodes,
+                   plan_actions, plan_route_approvals,
+                   report_devices, report_samples,
+                   server_ping_all)
 
 
-def mk(id, host, given, user="u", online=False, last=0, ips=None):
+def mk(id, host, given, user="u", online=False, last=0, ips=None, machine_key=""):
     return {"id": id, "hostname": host, "given_name": given,
             "user": user, "online": online, "last_seen": last,
-            "ips": ips or [], "machine_key": ""}
+            "ips": ips or [], "machine_key": machine_key}
 
+
+# ──────────────────────────── plan_actions ────────────────────────────────────
 
 def test_keep_online_delete_offline_rename_clean():
-    # 3 node itop: 8/11 offline, 15 online -> giu 15, xoa 8+11, doi ten 15 ve 'itop'
     nodes = [
-        mk("8", "itop", "itop", online=False, last=100),
-        mk("11", "itop", "itop-eu4igccy", online=False, last=200),
-        mk("15", "itop", "itop-i8shta5a", online=True, last=300),
+        mk("8",  "itop", "itop",           online=False, last=100),
+        mk("11", "itop", "itop-eu4igccy",  online=False, last=200),
+        mk("15", "itop", "itop-i8shta5a",  online=True,  last=300),
     ]
     acts = plan_actions(nodes)
     assert {a["id"] for a in acts if a["action"] == "delete"} == {"8", "11"}
@@ -51,7 +42,7 @@ def test_clean_single_node_no_action():
 
 
 def test_never_delete_online_duplicate():
-    nodes = [mk("a", "h", "h", online=True, last=100),
+    nodes = [mk("a", "h", "h",   online=True, last=100),
              mk("b", "h", "h-x", online=True, last=200)]
     acts = plan_actions(nodes)
     assert any(a["action"] == "skip" and a["id"] == "a" for a in acts)
@@ -59,35 +50,42 @@ def test_never_delete_online_duplicate():
 
 
 def test_different_users_not_merged():
-    nodes = [mk("1", "h", "h", user="x", online=True, last=1),
+    nodes = [mk("1", "h", "h",   user="x", online=True, last=1),
              mk("2", "h", "h-y", user="y", online=True, last=2)]
     assert not any(a["action"] == "delete" for a in plan_actions(nodes))
 
 
 def test_offline_only_group_keeps_latest():
-    # khong co node online -> giu cai last_seen moi nhat
     nodes = [mk("1", "h", "h-a", online=False, last=100),
              mk("2", "h", "h-b", online=False, last=500)]
     acts = plan_actions(nodes)
     assert {a["id"] for a in acts if a["action"] == "delete"} == {"1"}
-    assert any(a["action"] == "rename" and a["id"] == "2" and a["to"] == "h" for a in acts)
+    assert any(a["action"] == "rename" and a["id"] == "2" and a["to"] == "h"
+               for a in acts)
 
+
+def test_id_int_tiebreak_not_string():
+    # "9" > "10" theo string nhung 9 < 10 theo int -> keeper phai la id=10 (last_seen bang nhau)
+    nodes = [mk("9",  "h", "h-a", online=False, last=500),
+             mk("10", "h", "h-b", online=False, last=500)]
+    acts = plan_actions(nodes)
+    assert {a["id"] for a in acts if a["action"] == "delete"} == {"9"}
+
+
+# ──────────────────────────── plan_route_approvals ────────────────────────────
 
 def test_route_approval_advertised_route_gets_approved():
-    # node quang ba 10.0.0.0/8 nhung chua duyet -> phai duyet (camelCase API)
     raw = [{"id": 5, "availableRoutes": ["10.0.0.0/8"], "approvedRoutes": []}]
     assert plan_route_approvals(raw) == [("5", ["10.0.0.0/8"])]
 
 
 def test_route_approval_idempotent_when_already_approved():
-    # da duyet het route quang ba -> khong lam gi (tranh goi API thua)
     raw = [{"id": 5, "availableRoutes": ["10.0.0.0/8"],
             "approvedRoutes": ["10.0.0.0/8"]}]
     assert plan_route_approvals(raw) == []
 
 
 def test_route_approval_union_keeps_existing():
-    # them route moi nhung GIU route da duyet (hop, da sap xep)
     raw = [{"id": 7, "available_routes": ["192.168.1.0/24"],
             "approved_routes": ["10.0.0.0/8"]}]
     assert plan_route_approvals(raw) == [("7", ["10.0.0.0/8", "192.168.1.0/24"])]
@@ -95,70 +93,48 @@ def test_route_approval_union_keeps_existing():
 
 def test_route_approval_no_routes_or_no_id_skipped():
     raw = [
-        {"id": 9, "availableRoutes": [], "approvedRoutes": []},   # khong quang ba
-        {"availableRoutes": ["10.0.0.0/8"]},                        # thieu id -> bo
+        {"id": 9, "availableRoutes": [], "approvedRoutes": []},
+        {"availableRoutes": ["10.0.0.0/8"]},   # thiếu id -> bỏ
     ]
     assert plan_route_approvals(raw) == []
 
 
-def test_stale_reporters_all_fresh():
-    now = 1000
-    rows = [{"src": "collector", "ts": 990}, {"src": "vpn3", "ts": 995},
-            {"src": "vpn4", "ts": 980}]
-    assert stale_reporters(rows, ["collector", "vpn3", "vpn4"], now, 180) == []
-
-
-def test_stale_reporters_one_missing():
-    now = 1000
-    rows = [{"src": "collector", "ts": 990}, {"src": "vpn3", "ts": 995}]
-    assert stale_reporters(rows, ["collector", "vpn3", "vpn4"], now, 180) == ["vpn4"]
-
-
-def test_stale_reporters_old_sample_excluded():
-    now = 1000
-    rows = [{"src": "vpn3", "ts": 800}]  # 200s cu > window 180 -> coi nhu im
-    assert stale_reporters(rows, ["vpn3"], now, 180) == ["vpn3"]
-
-
-def test_stale_reporters_empty_expected_never_fails():
-    assert stale_reporters([{"src": "vpn3", "ts": 1}], [], 1000, 180) == []
-
+# ──────────────────────────── normalize ───────────────────────────────────────
 
 def test_normalize_camel_and_snake():
     raw = [
         {"id": 6, "name": "votam-pc", "givenName": "votam-pc",
          "user": {"name": "votam"}, "online": True,
-         "lastSeen": {"seconds": 123}, "ipAddresses": ["100.64.0.3", "fd7a::3"],
+         "lastSeen": "2024-01-15T10:02:03Z",  # RFC3339 (headscale 0.27.x)
+         "ipAddresses": ["100.64.0.3", "fd7a::3"],
          "machineKey": "mkey:x"},
         {"id": 8, "name": "itop", "given_name": "itop-x",
          "user": {"name": "u"}, "online": False,
-         "last_seen": {"seconds": 99}, "ip_addresses": ["100.64.0.1"],
+         "last_seen": {"seconds": 99},  # protobuf dict (backward compat)
+         "ip_addresses": ["100.64.0.1"],
          "machine_key": "mkey:y"},
     ]
     out = normalize(raw)
     assert out[0]["id"] == "6" and out[0]["hostname"] == "votam-pc"
     assert out[0]["given_name"] == "votam-pc" and out[0]["user"] == "votam"
-    assert out[0]["online"] is True and out[0]["last_seen"] == 123
+    assert out[0]["online"] is True and out[0]["last_seen"] > 0  # RFC3339 parsed to epoch
     assert out[1]["given_name"] == "itop-x" and out[1]["last_seen"] == 99
 
 
-# ---------------- server ping: CHI giam sat node SONG ----------------
+# ──────────────────────────── pingable_nodes + server_ping_all ───────────────
 
-def test_pingable_nodes_chi_online():
-    # Chi node ONLINE co IPv4 (khac 'collector') moi duoc ping. Offline / khong
-    # ipv4 / chinh la collector -> bo qua.
+def test_pingable_nodes_chi_online(monkeypatch):
+    monkeypatch.setattr("dedup.SRC_NAME", "collector")
     nodes = [
-        mk("1", "alive", "alive", online=True, ips=["100.64.0.2", "fd7a::2"]),
-        mk("2", "dead", "dead", online=False, ips=["100.64.0.3"]),      # offline -> bo
-        mk("3", "collector", "collector", online=True, ips=["100.64.0.1"]),  # nguon -> bo
-        mk("4", "noip", "noip", online=True, ips=["fd7a::9"]),          # khong co ipv4 -> bo
+        mk("1", "alive",     "alive",     online=True,  ips=["100.64.0.2", "fd7a::2"]),
+        mk("2", "dead",      "dead",      online=False, ips=["100.64.0.3"]),
+        mk("3", "collector", "collector", online=True,  ips=["100.64.0.1"]),
+        mk("4", "noip",      "noip",      online=True,  ips=["fd7a::9"]),
     ]
     assert pingable_nodes(nodes) == [("alive", "100.64.0.2")]
 
 
 def test_server_ping_all_khong_ping_node_chet():
-    # ping_fn gia: ghi lai IP da ping -> chung minh node offline KHONG bi ping
-    # (vong poll khong ton ~8s/node chet cho timeout).
     pinged = []
 
     def fake_ping(ip):
@@ -166,502 +142,89 @@ def test_server_ping_all_khong_ping_node_chet():
         return {"LatencySeconds": 0.01, "Endpoint": "1.2.3.4:41641"}
 
     nodes = [
-        mk("1", "alive", "alive", online=True, ips=["100.64.0.2"]),
-        mk("2", "dead", "dead", online=False, ips=["100.64.0.3"]),
+        mk("1", "alive", "alive", online=True,  ips=["100.64.0.2"]),
+        mk("2", "dead",  "dead",  online=False, ips=["100.64.0.3"]),
     ]
     samples = server_ping_all(nodes, ping_fn=fake_ping)
-    assert pinged == ["100.64.0.2"]                       # KHONG ping node offline
+    assert pinged == ["100.64.0.2"]
     assert len(samples) == 1
     assert samples[0]["dst"] == "alive" and samples[0]["ok"] is True
 
 
-# ---------------- collector (MAC + latency) ----------------
-
-def test_validate_report_ok():
-    r = validate_report({
-        "hostname": "itop", "ipv4": "100.64.0.1", "mac": "AA:BB:CC:DD:EE:FF",
-        "samples": [{"dst": "votam", "dst_ip": "100.64.0.3",
-                     "rtt_ms": 8.2, "path": "direct", "ok": True}],
-    })
-    assert r["hostname"] == "itop" and r["mac"] == "AA:BB:CC:DD:EE:FF"
-    assert len(r["samples"]) == 1
-    assert r["samples"][0]["dst"] == "votam" and r["samples"][0]["rtt_ms"] == 8.2
-
-
-def test_validate_report_missing_hostname():
-    with pytest.raises(ValueError):
-        validate_report({"samples": []})
-
-
-def test_validate_report_single_sample_as_dict():
-    # PowerShell 5.1 gui 1 sample duoi dang object (khong phai list) -> van nhan.
-    r = validate_report({"hostname": "itop",
-                         "samples": {"dst": "votam", "rtt_ms": 9.0, "path": "direct", "ok": True}})
-    assert len(r["samples"]) == 1 and r["samples"][0]["dst"] == "votam"
-
-
-def test_validate_report_drops_bad_samples_and_defaults_ok():
-    r = validate_report({"hostname": "h", "samples": [
-        {"dst": "", "rtt_ms": 1},          # bo: thieu dst
-        "notadict",                          # bo: khong phai dict
-        {"dst": "p", "rtt_ms": None},        # giu: ok mac dinh False (rtt None)
-        {"dst": "q", "rtt_ms": "5.5"},       # rtt chuoi -> 5.5, ok mac dinh True
-    ]})
-    dsts = {s["dst"]: s for s in r["samples"]}
-    assert set(dsts) == {"p", "q"}
-    assert dsts["p"]["ok"] is False and dsts["p"]["rtt_ms"] is None
-    assert dsts["q"]["rtt_ms"] == 5.5 and dsts["q"]["ok"] is True
-
-
-def test_aggregate_latency():
-    rows = [
-        {"src": "itop", "dst": "votam", "dst_ip": "x", "rtt_ms": 10.0, "path": "direct", "ok": True, "ts": 1},
-        {"src": "itop", "dst": "votam", "dst_ip": "x", "rtt_ms": 20.0, "path": "derp:myderp", "ok": True, "ts": 2},
-        {"src": "itop", "dst": "votam", "dst_ip": "x", "rtt_ms": None, "path": "", "ok": False, "ts": 3},
-    ]
-    agg = aggregate_latency(rows)
-    assert len(agg) == 1
-    a = agg[0]
-    assert a["count"] == 3 and a["min_ms"] == 10.0 and a["max_ms"] == 20.0 and a["avg_ms"] == 15.0
-    assert a["ok_pct"] == round(100 * 2 / 3, 1)
-    assert a["direct_pct"] == round(100 * 1 / 3, 1)
-    assert a["last_ts"] == 3 and a["last_path"] == ""
-
-
-def _mem_db():
-    conn = sqlite3.connect(":memory:")
-    init_db(conn)
-    init_latency_db(conn)
-    return conn
-
-
-def test_record_report_updates_mac_by_ipv4_and_inserts_samples():
-    conn = _mem_db()
-    conn.execute("INSERT INTO devices(user,hostname,mac,node_id,ipv4,machine_key,first_seen,last_seen,seen_count)"
-                 " VALUES('u','itop',NULL,'1','100.64.0.1','mk',0,0,1)")
-    conn.commit()
-    rep = validate_report({"hostname": "itop", "ipv4": "100.64.0.1", "mac": "AA:BB:CC",
-                           "samples": [{"dst": "votam", "dst_ip": "100.64.0.3",
-                                        "rtt_ms": 8.0, "path": "direct", "ok": True}]})
-    assert record_report(conn, rep, 123) == 1
-    assert conn.execute("SELECT mac FROM devices WHERE hostname='itop'").fetchone()[0] == "AA:BB:CC"
-    assert conn.execute("SELECT COUNT(*) FROM node_latency").fetchone()[0] == 1
-
+# ──────────────────────────── parse_pingresult ────────────────────────────────
 
 def test_parse_pingresult():
-    # SERVER ping qua LocalAPI -> PingResult
     d = parse_pingresult({"LatencySeconds": 0.012, "Endpoint": "1.2.3.4:41641"})
     assert d == {"ok": True, "rtt_ms": 12.0, "path": "direct"}
     r = parse_pingresult({"LatencySeconds": 0.045, "DERPRegionCode": "myderp"})
     assert r["ok"] and r["path"] == "derp:myderp" and r["rtt_ms"] == 45.0
     assert parse_pingresult({"Err": "timeout"})["ok"] is False
-    assert parse_pingresult({"LatencySeconds": 0})["ok"] is False     # chua co RTT
+    assert parse_pingresult({"LatencySeconds": 0})["ok"] is False
     assert parse_pingresult(None)["ok"] is False
 
 
-def test_is_tailnet_ip():
-    assert is_tailnet_ip("100.64.0.3") is True          # dai Tailscale v4
-    assert is_tailnet_ip("100.127.255.255") is True
-    assert is_tailnet_ip("127.0.0.1") is True           # loopback OK (debug local)
-    assert is_tailnet_ip("fd7a:115c:a1e0::1") is True   # dai Tailscale v6
-    assert is_tailnet_ip("10.121.5.18") is False        # LAN noi bo -> tu choi
-    assert is_tailnet_ip("8.8.8.8") is False            # internet -> tu choi
-    assert is_tailnet_ip("100.128.0.1") is False        # ngoai 100.64/10
-    assert is_tailnet_ip("khong-phai-ip") is False
+# ──────────────────────────── report_devices ──────────────────────────────────
 
-
-def test_is_allowed_report_src():
-    # tailnet + loopback van duoc
-    assert is_allowed_report_src("100.64.0.3") is True
-    assert is_allowed_report_src("127.0.0.1") is True
-    # mang docker noi bo (node bao cao qua forwarder ts-forward) -> duoc
-    assert is_allowed_report_src("172.18.0.7") is True   # dai docker bridge
-    assert is_allowed_report_src("10.0.0.5") is True
-    assert is_allowed_report_src("192.168.1.10") is True
-    # internet -> tu choi
-    assert is_allowed_report_src("8.8.8.8") is False
-    assert is_allowed_report_src("khong-phai-ip") is False
-
-
-def test_latency_series_groups_sorts_drops_bad():
-    rows = [
-        {"src": "itop", "dst": "votam", "rtt_ms": 10.0, "path": "direct", "ok": True, "ts": 3},
-        {"src": "itop", "dst": "votam", "rtt_ms": 12.0, "path": "direct", "ok": True, "ts": 1},
-        {"src": "itop", "dst": "votam", "rtt_ms": None, "path": "", "ok": False, "ts": 2},
+def test_report_devices_posts_payload():
+    nodes = [
+        mk("3", "vpn3", "vpn3", user="main", ips=["100.64.0.5", "fd7a::5"],
+           machine_key="mk:abc"),
+        mk("7", "vpn4", "vpn4", user="main", ips=["100.64.0.6"],
+           machine_key="mk:xyz"),
     ]
-    s = latency_series(rows)
-    assert len(s) == 1 and s[0]["pair"] == "itop -> votam"
-    assert [p["t"] for p in s[0]["points"]] == [1, 3]   # sorted, bad dropped
+    with patch("dedup._post_json", return_value=(200, {})) as mock_post:
+        report_devices(nodes)
+        assert mock_post.call_count == 1
+        url, body = mock_post.call_args[0]
+        assert url.endswith("/api/devices/report")
+        assert len(body["nodes"]) == 2
+        n0 = body["nodes"][0]
+        assert n0["hostname"] == "vpn3" and n0["node_id"] == "3"
+        assert n0["ipv4"] == "100.64.0.5"
+        assert n0["machine_key"] == "mk:abc"
 
 
-def test_query_devices():
-    conn = _mem_db()
-    conn.execute("INSERT INTO devices(user,hostname,mac,node_id,ipv4,machine_key,first_seen,last_seen,seen_count)"
-                 " VALUES('u','itop','AA:BB','1','100.64.0.1','mk',0,0,5)")
-    conn.commit()
-    d = query_devices(conn)
-    assert len(d) == 1 and d[0]["hostname"] == "itop"
-    assert d[0]["mac"] == "AA:BB" and d[0]["seen_count"] == 5
+def test_report_devices_skips_empty_hostname():
+    nodes = [mk("1", "", "", user="u")]
+    with patch("dedup._post_json", return_value=(200, {})) as mock_post:
+        report_devices(nodes)
+        mock_post.assert_not_called()
 
 
-def test_render_stats_html_smoke():
-    import json as _j
-    pairs = [{"src": "itop", "dst": "votam", "count": 2, "min_ms": 10.0, "avg_ms": 11.0,
-              "max_ms": 12.0, "ok_pct": 100.0, "direct_pct": 100.0,
-              "last_ms": 12.0, "last_path": "direct", "last_ts": 2}]
-    series = [{"pair": "itop -> votam", "points": [{"t": 1, "rtt": 10.0}, {"t": 2, "rtt": 12.0}]}]
-    devices = [{"hostname": "itop", "mac": "AA:BB", "ipv4": "100.64.0.1", "last_seen": 0, "seen_count": 2}]
-    page = render_stats_html(pairs, series, devices, 3600, 1000)
-    assert "<html" in page and "Chart" in page
-    assert "__DATA__" not in page          # placeholder da thay
-    assert "itop" in page and "votam" in page
-    frag = page.split("const D = ", 1)[1].split(";", 1)[0]
-    data = _j.loads(frag)
-    assert data["pairs"][0]["src"] == "itop" and data["window_min"] == 60
+def test_report_devices_logs_on_error():
+    nodes = [mk("1", "vpn3", "vpn3", user="main", ips=["100.64.0.5"])]
+    with patch("dedup._post_json", return_value=(503, {})):
+        with patch("dedup.log") as mock_log:
+            report_devices(nodes)
+            mock_log.assert_called_once()
+            assert "devices/report" in str(mock_log.call_args)
 
 
-def test_record_report_mac_fallback_by_hostname():
-    conn = _mem_db()
-    conn.execute("INSERT INTO devices(user,hostname,mac,node_id,ipv4,machine_key,first_seen,last_seen,seen_count)"
-                 " VALUES('u','votam',NULL,'2','','mk2',0,0,1)")  # chua co ipv4
-    conn.commit()
-    rep = validate_report({"hostname": "votam", "ipv4": "100.64.0.9", "mac": "11:22:33", "samples": []})
-    record_report(conn, rep, 1)
-    assert conn.execute("SELECT mac FROM devices WHERE hostname='votam'").fetchone()[0] == "11:22:33"
+# ──────────────────────────── report_samples ─────────────────────────────────
+
+def test_report_samples_posts_to_api_center():
+    samples = [{"dst": "vpn3", "dst_ip": "100.64.0.5",
+                "rtt_ms": 12.3, "path": "direct", "ok": True}]
+    with patch("dedup._post_json", return_value=(201, {})) as mock_post:
+        report_samples(samples)
+        assert mock_post.call_count == 1
+        url, body = mock_post.call_args[0]
+        assert url.endswith("/api/metrics/report")
+        assert body["samples"] == samples
+        assert "hostname" in body
 
 
-# ---------------- DERP status ----------------
-
-def test_parse_derp_regions_two_regions():
-    regions = _parse_derp_regions(
-        "myderp=https://vpn2.hangocthanh.io.vn/derp/probe,"
-        "vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe"
-    )
-    assert len(regions) == 2
-    assert regions[0] == {"code": "myderp", "url": "https://vpn2.hangocthanh.io.vn/derp/probe"}
-    assert regions[1]["code"] == "vpn3-vn"
+def test_report_samples_skips_empty():
+    with patch("dedup._post_json") as mock_post:
+        report_samples([])
+        mock_post.assert_not_called()
 
 
-def test_parse_derp_regions_three_regions():
-    regions = _parse_derp_regions(
-        "myderp=https://vpn2.hangocthanh.io.vn/derp/probe,"
-        "vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe,"
-        "vpn4-vn=https://vpn4.hangocthanh.io.vn/derp/probe"
-    )
-    assert len(regions) == 3
-    assert regions[2] == {"code": "vpn4-vn", "url": "https://vpn4.hangocthanh.io.vn/derp/probe"}
-
-
-def test_parse_derp_regions_empty():
-    assert _parse_derp_regions("") == []
-    assert _parse_derp_regions(None) == []
-
-
-def test_probe_derp_region_ok():
-    mock_resp = MagicMock()
-    mock_resp.status = 200
-    mock_resp.__enter__ = lambda s: s
-    mock_resp.__exit__ = MagicMock(return_value=False)
-    with patch("urllib.request.urlopen", return_value=mock_resp):
-        r = probe_derp_region("https://example.com/derp/probe")
-    assert r["ok"] is True and r["error"] is None
-    assert r["latency_ms"] is not None and r["latency_ms"] >= 0
-
-
-def test_probe_derp_region_fail():
-    with patch("urllib.request.urlopen", side_effect=OSError("connection refused")):
-        r = probe_derp_region("https://example.com/derp/probe")
-    assert r["ok"] is False
-    assert "connection refused" in (r["error"] or "")
-
-
-def test_query_current_relay_picks_latest():
-    conn = _mem_db()
-    now = int(time.time())
-    conn.executemany(
-        "INSERT INTO node_latency(ts,src,dst,dst_ip,rtt_ms,path,ok) VALUES(?,?,?,?,?,?,?)",
-        [
-            (now - 5, "collector", "server1", "100.64.0.5", 20.0, "derp:myderp", 1),
-            (now,     "collector", "server1", "100.64.0.5", 15.0, "derp:vpn3-vn", 1),  # moi nhat
-            (now,     "collector", "phone1",  "100.64.0.6",  2.0, "direct", 1),
-        ],
-    )
-    conn.commit()
-    rows = query_current_relay(conn, window=300)
-    by_host = {r["hostname"]: r for r in rows}
-    assert by_host["server1"]["relay"] == "derp:vpn3-vn"   # lan moi nhat
-    assert by_host["phone1"]["relay"] == "direct"
-
-
-def test_query_current_relay_respects_window():
-    conn = _mem_db()
-    now = int(time.time())
-    conn.execute(
-        "INSERT INTO node_latency(ts,src,dst,dst_ip,rtt_ms,path,ok) VALUES(?,?,?,?,?,?,?)",
-        (now - 500, "collector", "old-node", "100.64.0.9", 8.0, "direct", 1),
-    )
-    conn.commit()
-    rows = query_current_relay(conn, window=60)   # cua so nho -> khong thay
-    assert not any(r["hostname"] == "old-node" for r in rows)
-
-
-def test_peer_relay_from_status_relay_and_direct():
-    status = {
-        "Peer": {
-            "nodekey:aaa": {
-                "HostName": "server1",
-                "TailscaleIPs": ["100.64.0.5", "fd7a::5"],
-                "Relay": "vpn3-vn",
-                "CurAddr": "",          # khong di thang
-                "Online": True,
-            },
-            "nodekey:bbb": {
-                "HostName": "phone1",
-                "TailscaleIPs": ["100.64.0.6"],
-                "Relay": "myderp",
-                "CurAddr": "1.2.3.4:41641",  # di thang P2P
-                "Online": True,
-            },
-            "nodekey:ccc": {
-                "HostName": "laptop",
-                "TailscaleIPs": ["100.64.0.7"],
-                "Relay": "",
-                "CurAddr": "",
-                "Online": False,        # offline
-            },
-        }
-    }
-    peers = peer_relay_from_status(status)
-    by_host = {p["hostname"]: p for p in peers}
-
-    assert by_host["server1"]["relay"] == "vpn3-vn"
-    assert by_host["server1"]["direct"] is False
-    assert by_host["server1"]["online"] is True
-
-    assert by_host["phone1"]["relay"] == "myderp"
-    assert by_host["phone1"]["direct"] is True   # CurAddr non-empty -> direct P2P
-
-    assert by_host["laptop"]["online"] is False
-
-
-def test_peer_relay_from_status_empty():
-    assert peer_relay_from_status(None) == []
-    assert peer_relay_from_status({}) == []
-    assert peer_relay_from_status({"Peer": {}}) == []
-
-
-def test_render_derp_html_smoke():
-    regions = [
-        {"code": "myderp",  "url": "https://vpn2.../probe", "ok": True,  "latency_ms": 12.0, "error": None},
-        {"code": "vpn3-vn", "url": "https://vpn3.../probe", "ok": False, "latency_ms": None, "error": "timeout"},
-    ]
-    peers = [
-        {"hostname": "server1", "ip": "100.64.0.5", "relay": "vpn3-vn", "direct": False, "online": True},
-        {"hostname": "phone1",  "ip": "100.64.0.6", "relay": "myderp",  "direct": True,  "online": True},
-    ]
-    page = render_derp_html(regions, peers, 1200)
-    assert "<html" in page
-    assert "vpn2" in page and "vpn3-vn" in page and "myderp" not in page
-    assert "server1" in page and "phone1" in page
-    assert "direct" in page
-    assert "__GENERATED__" not in page
-    assert "__REGIONS__" not in page
-    assert "__ROWS__" not in page
-
-
-def test_render_derp_html_dead_relay_warning():
-    """Node dung relay chet phai hien badge canh bao (derp-dead), khong phai badge binh thuong."""
-    regions = [
-        {"code": "myderp",  "url": "https://vpn2.../probe", "ok": True,  "latency_ms": 12.0, "error": None},
-        {"code": "vpn3-vn", "url": "https://vpn3.../probe", "ok": False, "latency_ms": None, "error": "timeout"},
-    ]
-    peers = [
-        {"hostname": "itop", "ip": "100.64.0.2", "relay": "vpn3-vn", "direct": False, "online": True},
-    ]
-    page = render_derp_html(regions, peers, 1200)
-    assert "derp-dead" in page, "itop dung vpn3-vn (chet) phai hien badge canh bao"
-    assert "9888" in page or "&#9888;" in page, "phai co icon canh bao &#9888;"
-
-
-def test_render_derp_html_empty_peers():
-    regions = [{"code": "myderp", "url": "https://x/probe", "ok": True, "latency_ms": 5.0, "error": None}]
-    page = render_derp_html(regions, [], 1000)
-    assert "collector" in page.lower() or "Ch" in page
-
-
-# ---------------- client_netcheck ----------------
-
-def test_record_and_query_netcheck_basic():
-    """record_netcheck + query_latest_netcheck roundtrip."""
-    conn = _mem_db()
-    now = int(time.time())
-    rl = json.dumps({"vpn4-vn": 25.3, "myderp": 137.7, "vpn3-vn": None})
-    record_netcheck(conn, "itop", "vpn4-vn", rl, now)
-    rows = query_latest_netcheck(conn, window=300)
-    assert len(rows) == 1
-    assert rows[0]["client"] == "itop"
-    assert rows[0]["preferred_derp"] == "vpn4-vn"
-    assert rows[0]["region_latency"]["vpn4-vn"] == 25.3
-    assert rows[0]["region_latency"]["vpn3-vn"] is None
-
-
-def test_query_latest_netcheck_window_expired():
-    """Ban cu vuot qua window khong duoc tra ve."""
-    conn = _mem_db()
-    now = int(time.time())
-    record_netcheck(conn, "itop", "vpn4-vn", '{}', now - 700)
-    rows = query_latest_netcheck(conn, window=600)
-    assert rows == []
-
-
-def test_query_latest_netcheck_latest_per_client():
-    """Moi client chi tra ve ban moi nhat."""
-    conn = _mem_db()
-    now = int(time.time())
-    record_netcheck(conn, "itop", "myderp", '{"myderp": 50.0}', now - 10)
-    record_netcheck(conn, "itop", "vpn4-vn", '{"vpn4-vn": 25.3}', now)
-    rows = query_latest_netcheck(conn, window=300)
-    assert len(rows) == 1
-    assert rows[0]["preferred_derp"] == "vpn4-vn"
-
-
-def test_render_derp_html_all_pings_source_column():
-    """all_pings hien thi cot Nguon (vpn2/vpn3/vpn4) voi RTT va path tag."""
-    regions = [
-        {"code": "myderp",  "url": "https://vpn2.../probe", "ok": True, "latency_ms": 12.0, "error": None},
-        {"code": "vpn3-vn", "url": "https://vpn3.../probe", "ok": True, "latency_ms": 30.0, "error": None},
-        {"code": "vpn4-vn", "url": "https://vpn4.../probe", "ok": True, "latency_ms": 25.0, "error": None},
-    ]
-    all_pings = {
-        "collector": [
-            {"hostname": "itop",  "ip": "100.64.0.2", "relay": "derp:vpn4-vn",
-             "rtt_ms": 95.6, "ok": True, "ts": 1000},
-            {"hostname": "votam", "ip": "100.64.0.3", "relay": "derp:vpn4-vn",
-             "rtt_ms": 148.9, "ok": True, "ts": 1000},
-        ],
-        "vpn3": [
-            {"hostname": "itop",  "ip": "100.64.0.2", "relay": "direct",
-             "rtt_ms": 25.3, "ok": True, "ts": 1000},
-        ],
-        # vpn4: no data yet
-    }
-    page = render_derp_html(regions, [], 1000, all_pings=all_pings)
-    assert "vpn2" in page                  # row nguon vpn2
-    assert "vpn3" in page                  # row nguon vpn3 (co data)
-    assert "vpn4" in page                  # row nguon vpn4 (placeholder)
-    assert "95.6ms" in page and "148.9ms" in page   # vpn2 data
-    assert "25.3ms" in page                # vpn3 data
-    assert "via vpn4-vn" in page           # path tag vpn2->itop
-    assert "direct" in page                # path tag vpn3->itop
-    assert "__PINGS__" not in page
-
-
-def test_render_derp_html_all_pings_empty():
-    """all_pings={}: tat ca nguon hien placeholder 'chua co du lieu'."""
-    regions = [
-        {"code": "myderp",  "url": "https://vpn2.../probe", "ok": True, "latency_ms": 12.0, "error": None},
-        {"code": "vpn3-vn", "url": "https://vpn3.../probe", "ok": False,"latency_ms": None, "error": "timeout"},
-        {"code": "vpn4-vn", "url": "https://vpn4.../probe", "ok": True, "latency_ms": 25.0, "error": None},
-    ]
-    page = render_derp_html(regions, [], 1000, all_pings={})
-    assert "vpn2" in page and "vpn3" in page and "vpn4" in page
-    assert "__PINGS__" not in page
-
-
-def test_render_derp_html_no_pings():
-    """all_pings=None: vpn2/vpn3/vpn4 row van hien placeholder."""
-    regions = [
-        {"code": "myderp",  "url": "https://x/probe", "ok": True, "latency_ms": 5.0, "error": None},
-        {"code": "vpn3-vn", "url": "https://x/probe", "ok": True, "latency_ms": 5.0, "error": None},
-    ]
-    page = render_derp_html(regions, [], 1000, all_pings=None)
-    assert "vpn2" in page and "vpn3" in page
-    assert "__PINGS__" not in page
-
-
-def test_derp_probe_urls_co_vpn5_vpn6():
-    """DERP_PROBE_URLS mac dinh phai co vpn5 + vpn6 (de hien card + nguon tren /derp)."""
-    assert "vpn5" in DERP_PROBE_URLS, "DERP_PROBE_URLS phai co vpn5"
-    assert "vpn6" in DERP_PROBE_URLS, "DERP_PROBE_URLS phai co vpn6"
-    codes = [r["code"] for r in _parse_derp_regions(DERP_PROBE_URLS)]
-    assert "vpn6-vn" in codes and "vpn5-us" in codes
-    # vpn5/vpn6 la relay -> probe /relay/probe (khong phai /derp/probe)
-    urls = {r["code"]: r["url"] for r in _parse_derp_regions(DERP_PROBE_URLS)}
-    assert urls["vpn6-vn"].endswith("/relay/probe")
-
-
-def test_render_derp_html_vpn5_vpn6_nguon_label():
-    """Nguon cho vpn5-us/vpn6-vn phai map ve 'vpn5'/'vpn6' (strip hau to dia ly)."""
-    regions = [
-        {"code": "vpn5-us", "url": "https://vpn5.../relay/probe", "ok": True, "latency_ms": 9.0, "error": None},
-        {"code": "vpn6-vn", "url": "https://vpn6.../relay/probe", "ok": True, "latency_ms": 9.0, "error": None},
-    ]
-    all_pings = {
-        "vpn6": [{"hostname": "itop", "ip": "100.64.0.6", "relay": "direct",
-                  "rtt_ms": 30.0, "ok": True, "ts": 1000}],
-    }
-    page = render_derp_html(regions, [], 1000, all_pings=all_pings)
-    # Nguon hien 'vpn6' (khong phai 'vpn6-vn') va co data ping vpn6
-    assert ">vpn6<" in page or "vpn6</td>" in page
-    assert "30.0ms" in page          # data src=vpn6 hien duoc (khop _code_to_src)
-
-
-def test_query_all_server_pings_multi_src():
-    """query_all_server_pings tra ve dict {src: [peers]} cho moi src."""
-    conn = _mem_db()
-    now = int(time.time())
-    conn.executemany(
-        "INSERT INTO node_latency(ts,src,dst,dst_ip,rtt_ms,path,ok) VALUES(?,?,?,?,?,?,?)",
-        [
-            (now, "collector", "itop",  "100.64.0.2", 95.6,  "derp:vpn4-vn", 1),
-            (now, "collector", "votam", "100.64.0.3", 148.9, "derp:vpn4-vn", 1),
-            (now, "vpn3",      "itop",  "100.64.0.2", 25.3,  "direct",       1),
-            (now, "vpn4",      "votam", "100.64.0.3", 28.0,  "direct",       1),
-        ],
-    )
-    conn.commit()
-    result = query_all_server_pings(conn, window=300)
-    assert set(result.keys()) == {"collector", "vpn3", "vpn4"}
-    assert len(result["collector"]) == 2
-    assert result["vpn3"][0]["hostname"] == "itop" and result["vpn3"][0]["rtt_ms"] == 25.3
-    assert result["vpn4"][0]["hostname"] == "votam"
-
-
-def test_query_all_server_pings_picks_latest():
-    """Chi lay lan ping moi nhat per (src, dst)."""
-    conn = _mem_db()
-    now = int(time.time())
-    conn.executemany(
-        "INSERT INTO node_latency(ts,src,dst,dst_ip,rtt_ms,path,ok) VALUES(?,?,?,?,?,?,?)",
-        [
-            (now - 10, "vpn3", "itop", "100.64.0.2", 50.0, "derp:myderp", 1),
-            (now,      "vpn3", "itop", "100.64.0.2", 25.3, "direct",      1),  # moi hon
-        ],
-    )
-    conn.commit()
-    result = query_all_server_pings(conn, window=300)
-    assert result["vpn3"][0]["relay"] == "direct"    # moi nhat
-    assert result["vpn3"][0]["rtt_ms"] == 25.3
-
-
-def test_query_all_server_pings_window():
-    """Row ngoai window khong duoc tra ve."""
-    conn = _mem_db()
-    now = int(time.time())
-    conn.execute(
-        "INSERT INTO node_latency(ts,src,dst,dst_ip,rtt_ms,path,ok) VALUES(?,?,?,?,?,?,?)",
-        (now - 500, "vpn3", "itop", "100.64.0.2", 25.0, "direct", 1),
-    )
-    conn.commit()
-    assert query_all_server_pings(conn, window=60) == {}
-
-
-def test_render_derp_html_ajax_refresh():
-    """Trang /derp dung AJAX fetch moi 5s thay vi meta refresh."""
-    regions = [{"code": "myderp", "url": "https://x/probe",
-                "ok": True, "latency_ms": 5.0, "error": None}]
-    page = render_derp_html(regions, [], 1000)
-    assert "meta http-equiv" not in page    # khong dung meta refresh
-    assert "setInterval" in page            # dung JS setInterval
-    assert "5000" in page                   # interval 5 giay
-    assert "fetch(" in page                 # AJAX fetch
+def test_report_samples_logs_on_error():
+    samples = [{"dst": "vpn3", "dst_ip": "100.64.0.5",
+                "rtt_ms": 5.0, "path": "direct", "ok": True}]
+    with patch("dedup._post_json", return_value=(500, {})):
+        with patch("dedup.log") as mock_log:
+            report_samples(samples)
+            mock_log.assert_called_once()
+            assert "metrics/report" in str(mock_log.call_args)

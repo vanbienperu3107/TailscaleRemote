@@ -18,28 +18,30 @@ env:
 
 jobs:
   # ── 1. Build & type-check ────────────────────────────────────────────────────
+  # modules/admin-ui/ is an external repo (shadcnAdminCustom). It may not exist
+  # in this checkout. The build step skips gracefully when the directory is absent.
   build:
     name: Build admin-ui
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ${{ env.MODULE }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Install deps
+      - name: Install, type-check and build
         run: |
+          if [ ! -d "${{ env.MODULE }}" ]; then
+            echo "::notice::${{ env.MODULE }} not present (external repo) — skipping build"
+            exit 0
+          fi
+          cd "${{ env.MODULE }}"
           if [ -f pnpm-lock.yaml ]; then
             npm install -g pnpm && pnpm install --frozen-lockfile
           else
             npm install
           fi
-      - name: Type check
-        run: npx tsc --noEmit 2>/dev/null || true
-      - name: Build
-        run: npm run build 2>/dev/null || npx vite build
+          npx tsc --noEmit
+          npm run build
 
   # ── 2. Contract impact check ──────────────────────────────────────────────────
   contract-check:
@@ -62,7 +64,7 @@ jobs:
     name: Push admin-ui image
     runs-on: ubuntu-latest
     needs: [build, contract-check]
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && hashFiles('modules/admin-ui/Dockerfile') != ''
     permissions:
       contents: read
       packages: write

@@ -112,14 +112,21 @@ export async function nodeAssignmentsRoutes(app: FastifyInstance): Promise<void>
       }
 
       const { regionIds } = parsed.data
-      await db.transaction(async (tx) => {
-        await tx.delete(derpNodeAssignments).where(eq(derpNodeAssignments.nodeKey, nodeKey))
-        if (regionIds.length > 0) {
-          await tx.insert(derpNodeAssignments).values(
-            regionIds.map((regionId) => ({ nodeKey, regionId }))
-          )
+      try {
+        await db.transaction(async (tx) => {
+          await tx.delete(derpNodeAssignments).where(eq(derpNodeAssignments.nodeKey, nodeKey))
+          if (regionIds.length > 0) {
+            await tx.insert(derpNodeAssignments).values(
+              regionIds.map((regionId) => ({ nodeKey, regionId }))
+            )
+          }
+        })
+      } catch (err) {
+        if (typeof err === 'object' && err !== null && (err as { code?: string }).code === '23503') {
+          return reply.code(422).send({ error: 'invalid_region_id' })
         }
-      })
+        throw err
+      }
 
       return { nodeKey, regionIds }
     }

@@ -81,25 +81,33 @@ export async function derpRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/derp', async (req, reply) => {
     const parsed = createSchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'invalid', details: parsed.error.flatten() })
-    const used = await db.select({ regionId: derpServers.regionId }).from(derpServers)
-    const regionId = nextRegionId(used.map((r) => r.regionId))
-    try {
-      const [row] = await db
-        .insert(derpServers)
-        .values({ ...parsed.data, regionId, embedded: false })
-        .returning()
-      return reply.code(201).send(row)
-    } catch (err) {
-      if (isUniqueViolation(err)) {
-        return reply.code(409).send({ error: 'conflict', message: 'code hoặc node_name đã tồn tại' })
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const used = await db.select({ regionId: derpServers.regionId }).from(derpServers)
+      const regionId = nextRegionId(used.map((r) => r.regionId))
+      try {
+        const [row] = await db
+          .insert(derpServers)
+          .values({ ...parsed.data, regionId, embedded: false })
+          .returning()
+        return reply.code(201).send(row)
+      } catch (err) {
+        if (isUniqueViolation(err) && attempt < 2) continue
+        if (isUniqueViolation(err)) {
+          return reply.code(409).send({ error: 'conflict', message: 'code hoặc node_name đã tồn tại' })
+        }
+        throw err
       }
-      throw err
     }
+    return reply.code(409).send({ error: 'conflict', message: 'code hoặc node_name đã tồn tại' })
   })
 
   // Sửa
   app.patch<{ Params: { regionId: string } }>('/api/derp/:regionId', async (req, reply) => {
     const regionId = Number(req.params.regionId)
+    if (!Number.isFinite(regionId) || regionId <= 0) {
+      return reply.code(400).send({ error: 'invalid_region_id' })
+    }
     const parsed = updateSchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'invalid', details: parsed.error.flatten() })
     const [existing] = await db.select().from(derpServers).where(eq(derpServers.regionId, regionId))
@@ -123,6 +131,9 @@ export async function derpRoutes(app: FastifyInstance): Promise<void> {
   // Bật/tắt (ON/OFF) hoặc tạm dừng
   app.post<{ Params: { regionId: string } }>('/api/derp/:regionId/toggle', async (req, reply) => {
     const regionId = Number(req.params.regionId)
+    if (!Number.isFinite(regionId) || regionId <= 0) {
+      return reply.code(400).send({ error: 'invalid_region_id' })
+    }
     const parsed = toggleSchema.safeParse(req.body)
     if (!parsed.success) return reply.code(400).send({ error: 'invalid' })
     const [existing] = await db.select().from(derpServers).where(eq(derpServers.regionId, regionId))
@@ -144,6 +155,9 @@ export async function derpRoutes(app: FastifyInstance): Promise<void> {
   // Xóa
   app.delete<{ Params: { regionId: string } }>('/api/derp/:regionId', async (req, reply) => {
     const regionId = Number(req.params.regionId)
+    if (!Number.isFinite(regionId) || regionId <= 0) {
+      return reply.code(400).send({ error: 'invalid_region_id' })
+    }
     const [existing] = await db.select().from(derpServers).where(eq(derpServers.regionId, regionId))
     if (!existing) return reply.code(404).send({ error: 'not_found' })
     if (existing.embedded) return reply.code(403).send({ error: 'embedded_readonly' })

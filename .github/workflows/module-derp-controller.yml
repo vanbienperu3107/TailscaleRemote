@@ -19,7 +19,7 @@ jobs:
   build:
     name: Build derp-controller image
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || github.event_name == 'pull_request'
     permissions:
       contents: read
       packages: write
@@ -37,7 +37,8 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: ${{ env.MODULE }}
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
+          load: ${{ github.event_name == 'pull_request' }}
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
@@ -52,6 +53,7 @@ jobs:
     name: Deploy derp-controller to vpn2+vpn6
     runs-on: ubuntu-latest
     needs: build
+    if: github.ref == 'refs/heads/main'
     continue-on-error: true
     environment: production
     steps:

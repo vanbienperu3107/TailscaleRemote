@@ -24,12 +24,6 @@
   handle /app/api/*      { reverse_proxy api-center:8787 }
   handle /app/*          { reverse_proxy admin-ui:80 }
 
-  # ── Latency diagnostics (nội bộ) ─────────────────────────────────────────
-  handle /derp-status*   {
-    uri strip_prefix /derp-status
-    reverse_proxy latency:8090
-  }
-
   # ── Redirect root → Admin-UI ──────────────────────────────────────────────
   @root path /
   handle @root { redir * /app/ 302 }
