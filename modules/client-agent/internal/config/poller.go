@@ -11,9 +11,10 @@ type Change struct {
 	Old *Config
 	New *Config
 	// convenience flags
-	LanRoutesChanged    bool
-	GostArgsChanged     bool
-	IntervalChanged     bool
+	LanRoutesChanged bool
+	GostArgsChanged  bool
+	IntervalChanged  bool
+	PingChanged      bool
 }
 
 func diff(old, new *Config) Change {
@@ -31,6 +32,9 @@ func diff(old, new *Config) Change {
 	if old.MetricsInterval != new.MetricsInterval {
 		c.IntervalChanged = true
 	}
+	if old.PingCount != new.PingCount || old.PingTimeout != new.PingTimeout {
+		c.PingChanged = true
+	}
 	return c
 }
 
@@ -46,11 +50,11 @@ func RunPoller(ctx context.Context, serverURL string, fetchInterval time.Duratio
 			return
 		}
 		if current == nil {
-			// First fetch: fire GostArgsChanged + IntervalChanged so agent initializes
-			// gost and metrics ticker from the live config. Do NOT fire LanRoutesChanged
-			// here — main.go already calls ts.Up() at startup with the initial routes.
+			// First fetch: fire GostArgsChanged + IntervalChanged + PingChanged so agent
+			// initializes gost and metrics ticker from the live config. Do NOT fire
+			// LanRoutesChanged here — main.go already calls ts.Up() at startup.
 			onChange(Change{Old: Defaults(), New: cfg,
-				GostArgsChanged: true, IntervalChanged: true})
+				GostArgsChanged: true, IntervalChanged: true, PingChanged: true})
 		} else {
 			c := diff(current, cfg)
 			if c.LanRoutesChanged || c.GostArgsChanged || c.IntervalChanged {

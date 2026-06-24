@@ -33,26 +33,45 @@ type sample struct {
 }
 
 type Reporter struct {
-	serverURL string
-	secret    string
-	tsStatus  func(ctx context.Context) ([]byte, error)
-	tsPing    func(ctx context.Context, ip string, count int, timeout string) (string, error)
-	interval  atomic.Int64 // seconds
+	serverURL   string
+	secret      string
+	tsStatus    func(ctx context.Context) ([]byte, error)
+	tsPing      func(ctx context.Context, ip string, count int, timeout string) (string, error)
+	interval    atomic.Int64  // seconds
+	pingCount   atomic.Int64
+	pingTimeout atomic.Value  // string
 }
 
 func New(serverURL, secret string,
 	tsStatus func(context.Context) ([]byte, error),
 	tsPing func(context.Context, string, int, string) (string, error),
-	intervalSec int,
+	intervalSec, pingCount int, pingTimeout string,
 ) *Reporter {
 	r := &Reporter{serverURL: serverURL, secret: secret, tsStatus: tsStatus, tsPing: tsPing}
 	r.interval.Store(int64(intervalSec))
+	if pingCount <= 0 {
+		pingCount = 2
+	}
+	r.pingCount.Store(int64(pingCount))
+	if pingTimeout == "" {
+		pingTimeout = "3s"
+	}
+	r.pingTimeout.Store(pingTimeout)
 	return r
 }
 
 func (r *Reporter) SetInterval(sec int) {
 	if sec > 0 {
 		r.interval.Store(int64(sec))
+	}
+}
+
+func (r *Reporter) SetPingParams(count int, timeout string) {
+	if count > 0 {
+		r.pingCount.Store(int64(count))
+	}
+	if timeout != "" {
+		r.pingTimeout.Store(timeout)
 	}
 }
 
@@ -113,6 +132,9 @@ func (r *Reporter) report(ctx context.Context) error {
 	selfIP := firstV4(st.Self.TailscaleIPs)
 	mac := primaryMAC()
 
+	count := int(r.pingCount.Load())
+	timeout := r.pingTimeout.Load().(string)
+
 	var samples []sample
 	for _, peer := range st.Peer {
 		if !peer.Online {
@@ -122,8 +144,8 @@ func (r *Reporter) report(ctx context.Context) error {
 		if ip == "" {
 			continue
 		}
-		out, _ := r.tsPing(ctx, ip, 2, "3s")
-		s := parsePing(out, ip, peer.HostName, 2)
+		out, _ := r.tsPing(ctx, ip, count, timeout)
+		s := parsePing(out, ip, peer.HostName, count)
 		samples = append(samples, s)
 	}
 	if len(samples) == 0 {

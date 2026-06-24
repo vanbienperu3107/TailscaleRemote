@@ -16,19 +16,23 @@ type Config struct {
 	GostFallback    bool   `json:"gost_fallback"`
 	MetricsInterval int    `json:"metrics_interval"`
 	ProxyRank       string `json:"proxy_rank"`
-	GostListenPort  int    `json:"gost_listen_port"`  // votam HTTP proxy listen port
-	GostItopAddr    string `json:"gost_itop_addr"`    // explicit itop proxy addr for chain (optional)
-	GostItopPort    int    `json:"gost_itop_port"`    // itop HTTP proxy server port
+	GostListenPort  int    `json:"gost_listen_port"`
+	GostItopAddr    string `json:"gost_itop_addr"`
+	GostItopPort    int    `json:"gost_itop_port"`
+	PingCount       int    `json:"ping_count"`
+	PingTimeout     string `json:"ping_timeout"`
 }
 
 func Defaults() *Config {
 	return &Config{
-		LanRoutes:      "10.0.0.0/8",
-		ItopLanPrefix:  "10.121.",
+		LanRoutes:       "10.0.0.0/8",
+		ItopLanPrefix:   "10.121.",
 		MetricsInterval: 60,
-		ProxyRank:      "socks5:7654",
-		GostListenPort: 18888,
-		GostItopPort:   18080,
+		ProxyRank:       "socks5:7654",
+		GostListenPort:  18888,
+		GostItopPort:    18080,
+		PingCount:       2,
+		PingTimeout:     "3s",
 	}
 }
 
@@ -62,6 +66,12 @@ func Fetch(serverURL string) (*Config, error) {
 	}
 	if cfg.ProxyRank == "" {
 		cfg.ProxyRank = "socks5:7654"
+	}
+	if cfg.PingCount <= 0 {
+		cfg.PingCount = 2
+	}
+	if cfg.PingTimeout == "" {
+		cfg.PingTimeout = "3s"
 	}
 	return &cfg, nil
 }

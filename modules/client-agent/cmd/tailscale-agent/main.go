@@ -120,7 +120,7 @@ func main() {
 	}
 
 	// ── 8. Metrics reporter ───────────────────────────────────────────────────
-	reporter := metrics.New(*serverURL, *secret, ts.Status, ts.Ping, initialCfg.MetricsInterval)
+	reporter := metrics.New(*serverURL, *secret, ts.Status, ts.Ping, initialCfg.MetricsInterval, initialCfg.PingCount, initialCfg.PingTimeout)
 	if err := reporter.ReportActivePorts(ctx, socksPort, httpPort); err != nil {
 		log.Printf("[main] active_ports report: %v", err)
 	}
@@ -160,6 +160,11 @@ func main() {
 		if c.IntervalChanged {
 			log.Printf("[main] metrics_interval → %ds", c.New.MetricsInterval)
 			reporter.SetInterval(c.New.MetricsInterval)
+		}
+
+		if c.PingChanged {
+			log.Printf("[main] ping params → count=%d timeout=%s", c.New.PingCount, c.New.PingTimeout)
+			reporter.SetPingParams(c.New.PingCount, c.New.PingTimeout)
 		}
 	})
 
