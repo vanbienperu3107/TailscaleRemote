@@ -99,7 +99,7 @@ func TestReporter_post(t *testing.T) {
 	r := New(srv.URL, "test-secret",
 		func(context.Context) ([]byte, error) { return []byte("{}"), nil },
 		func(context.Context, string, int, string) (string, error) { return "", nil },
-		60,
+		60, 2, "3s",
 	)
 	body, _ := json.Marshal(map[string]any{"hostname": "test"})
 	if err := r.post(context.Background(), body); err != nil {
