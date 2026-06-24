@@ -6,7 +6,7 @@
 #   - POST ket qua den $DashboardUrl/api/metrics/report voi X-Metrics-Secret header
 #
 # Cau hinh: tao file 'metrics-config.ps1' canh script de override (dot-sourced):
-#   $DashboardUrl    = 'https://dashboard.hangocthanh.io.vn'
+#   $DashboardUrl    = 'https://vpn2.hangocthanh.io.vn/app'
 #   $MetricsSecret   = 'your-shared-secret'
 #   $Interval        = 60
 #   $PingTimeout     = '3s'
@@ -22,7 +22,7 @@ $ProgressPreference = 'SilentlyContinue'
 $base = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # ---- Cau hinh mac dinh -------------------------------------------------------
-$DashboardUrl  = 'https://dashboard.hangocthanh.io.vn'
+$DashboardUrl  = 'https://vpn2.hangocthanh.io.vn/app'
 $MetricsSecret = ''
 $Interval      = 60
 $PingCount     = 2
