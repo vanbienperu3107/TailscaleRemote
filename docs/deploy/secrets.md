@@ -39,17 +39,19 @@ Không commit file `.env` vào repo. Deploy workflow ghi `.env` từ secrets tr�
 | `HS_DB_PASS` | derp-controller | Database password |
 | `HEADSCALE_NOISE_KEY` | deploy-control-plane | `cat noise_private.key \| base64`. **Phải giống nhau vpn2+vpn6** |
 | `TS_AUTHKEY` | collector-sidecar | Pre-auth key để join tailnet làm `collector` |
-| `DERP_PROBE_URLS` | latency module | `vpn3=https://vpn3.hangocthanh.io.vn/derp/probe,...` |
 
 ### Relay Nodes
 
+`module-derp-relay.yml` không hardcode danh sách node — job `discover` fetch `/derpmap.json` (public, api-center dựng từ bảng `derp_servers`) để lấy danh sách relay node active, rồi job `deploy-relay` tra secret SSH động theo quy ước `VPN{N}_HOST/_USER/_SSH_KEY` (N = chữ số trong tên node). Thêm node mới vào DB + khai đủ 3 secret dưới đây là tự động được đưa vào deploy, không cần sửa workflow. Node thiếu secret sẽ bị bỏ qua (cảnh báo, không fail workflow).
+
 | Secret | Dùng bởi | Mô tả |
 |--------|---------|-------|
-| `VPN3_USER` | module-derp-relay | SSH user vpn3 |
-| `VPN3_SSH_KEY` | module-derp-relay | SSH key vpn3 |
-| `VPN4_HOST` | module-derp-relay | IP vpn4 |
-| `VPN4_USER` | module-derp-relay | SSH user vpn4 |
-| `VPN4_SSH_KEY` | module-derp-relay | SSH key vpn4 |
+| `VPN3_USER` | module-derp-relay (`deploy-relay` matrix) | SSH user vpn3 |
+| `VPN3_SSH_KEY` | module-derp-relay (`deploy-relay` matrix) | SSH key vpn3 |
+| `VPN4_HOST` | module-derp-relay (`deploy-relay` matrix) | IP vpn4 |
+| `VPN4_USER` | module-derp-relay (`deploy-relay` matrix) | SSH user vpn4 |
+| `VPN4_SSH_KEY` | module-derp-relay (`deploy-relay` matrix) | SSH key vpn4 |
+| `VPN{N}_HOST/USER/SSH_KEY` | module-derp-relay (`deploy-relay` matrix) | Mẫu chung cho bất kỳ relay node mới nào — N lấy từ tên node trong `/derpmap.json` |
 
 ### Exit Node (standalone)
 
@@ -123,13 +125,12 @@ HEADSCALE_DATABASE_POSTGRES_SSL=true
 ```env
 HS_API_URL=http://derp-controller:8080
 HS_API_KEY=...           # = HEADSCALE_API_KEY
+API_CENTER_URL=http://api-center:8787
 POLL_INTERVAL=30
-DB_PATH=/data/devices.db
 DRY_RUN=false
 AUTO_APPROVE_ROUTES=true
-METRICS_PORT=8090
 TS_SOCKET=/var/run/tailscale/tailscaled.sock
-DERP_PROBE_URLS=...
+SRC_NAME=collector
 ```
 
 ### collector-sidecar
@@ -138,7 +139,7 @@ TS_AUTHKEY=...
 TS_EXTRA_ARGS=--login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false
 TS_STATE_DIR=/var/lib/tailscale
 TS_SOCKET=/var/run/tailscale/tailscaled.sock
-FORWARD_TARGET=latency:8090
+FORWARD_TARGET=api-center:8787
 FORWARD_PORT=8090
 ```
 

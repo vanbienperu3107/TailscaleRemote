@@ -66,250 +66,105 @@
     <a href="../index.html" style="margin-top:16px;border-top:1px solid #1e2d4a;padding-top:16px">&#8592; Trang chủ</a>
   </nav>
   <main>
-    <h1>Module: latency (node-dedup + collector)</h1>
-    <p class="subtitle">Collector HTTP server, node dedup, auto-approve routes — chạy trên vpn2</p>
+    <h1>Module: latency</h1>
+    <p class="subtitle">Node dedup + server ping + auto-approve routes — ghi dữ liệu vào Neon Postgres qua api-center</p>
 
-    <h2>Tổng quan</h2>
     <div class="meta-grid">
       <div class="meta-item"><div class="k">Image</div><div class="v">ghcr.io/vanbienperu3107/latency:latest</div></div>
-      <div class="meta-item"><div class="k">Source</div><div class="v">modules/latency/dedup.py (Python 3.12)</div></div>
+      <div class="meta-item"><div class="k">Source</div><div class="v">modules/latency/dedup.py (Python 3)</div></div>
+      <div class="meta-item"><div class="k">Stack</div><div class="v">Python 3 — single process, không HTTP server, không SQLite</div></div>
       <div class="meta-item"><div class="k">Chạy trên</div><div class="v">vpn2 only</div></div>
-      <div class="meta-item"><div class="k">Port</div><div class="v">8090 (HTTP collector, chỉ trong tailnet)</div></div>
+      <div class="meta-item"><div class="k">Port exposed</div><div class="v">— (không có)</div></div>
+      <div class="meta-item"><div class="k">Phụ thuộc</div><div class="v">api-center, derp-controller, ts_sock volume</div></div>
     </div>
 
     <h2>Mục đích</h2>
-    <p>Module <code>latency</code> là thành phần trung tâm trên vpn2, đảm nhiệm ba chức năng độc lập trong một tiến trình Python duy nhất:</p>
+    <p>Module latency chạy một vòng lặp poll để thực hiện 3 nhiệm vụ:</p>
     <ol>
-      <li><strong>Node Dedup</strong> — Tự động dọn dẹp node trùng trong Headscale.</li>
-      <li><strong>Collector</strong> — HTTP server nhận báo cáo latency từ relay nodes và Windows client, phục vụ dashboard và API.</li>
-      <li><strong>Auto-approve Routes</strong> — Tự động duyệt route advertisement, không cần tác động thủ công.</li>
+      <li><strong>Node Dedup</strong> — gom node trùng headscale (cùng hostname) theo (user, hostname), giữ lại 1, xóa bản trùng OFFLINE.</li>
+      <li><strong>Server-side ping</strong> — ping tất cả node ONLINE qua LocalAPI tailscale sidecar → ghi latency lên Neon Postgres via api-center.</li>
+      <li><strong>Auto-approve routes</strong> — tự động duyệt mọi route node quảng bá, không cần tag/duyệt tay.</li>
     </ol>
-    <div class="warn">Module này <strong>phải chạy cùng host với <code>collector-sidecar</code></strong> (chia sẻ unix socket).</div>
+    <div class="note"><strong>Không có HTTP server, không có SQLite.</strong> Tất cả dữ liệu lưu vào Neon Postgres qua api-center.</div>
 
-    <h2>Kiến trúc tổng thể</h2>
-    <pre><code>                    +---------------------------------+
-                    |         vpn2 host                |
-                    |                                  |
-  relay nodes -----&gt;|  collector-sidecar               |
-  (qua tailnet)    |  (tailscale + socat :8090)       |
-                    |         |                        |
-                    |         v forward                |
-                    |  +---------------------------+   |
-                    |  |   latency container        |   |
-                    |  |                           |   |
-                    |  |  [Node Dedup]             |   |
-                    |  |  poll Headscale API       |   |
-                    |  |  xoa node trung           |   |
-                    |  |                           |   |
-                    |  |  [Collector :8090]        |   |
-                    |  |  POST /metrics/report     |&lt;--+-- vpn3/vpn4/vpn6 reporter
-                    |  |  GET  /metrics/latency    |   |   Windows client
-                    |  |  GET  /metrics/health     |   |
-                    |  |  GET  /stats              |   |
-                    |  |  GET  /derp-status        |   |
-                    |  |                           |   |
-                    |  |  [Auto-approve Routes]    |   |
-                    |  |  poll &amp; approve           |   |
-                    |  |                           |   |
-                    |  |  [Server Ping]            |   |
-                    |  |  LocalAPI -&gt; ping peers   |   |
-                    |  +---------------------------+   |
-                    |         | ts_sock volume          |
-                    |         v                        |
-                    |  /var/run/tailscale/tailscaled.sock |
-                    +---------------------------------+</code></pre>
+    <h2>Kiến trúc dữ liệu</h2>
+    <pre><code>latency module (dedup.py)
+    │
+    ├── GET /api/v1/node  ──────────────────→ derp-controller:8080
+    │   (đọc danh sách node)
+    │
+    ├── POST /api/devices/report ──────────→ api-center:8787 → Neon (bảng devices)
+    │   (upsert lịch sử thiết bị sau mỗi poll)
+    │
+    ├── POST /api/metrics/report ──────────→ api-center:8787 → Neon (bảng latency_samples)
+    │   (ghi kết quả server-side ping)
+    │
+    ├── LocalAPI /localapi/v0/ping ────────→ ts_sock (tailscale sidecar)
+    │   (ping từng node qua WireGuard/DERP)
+    │
+    └── POST /api/v1/node/{id}/approve_routes → derp-controller:8080
+        (tự duyệt route)</code></pre>
 
-    <h2>Phần 1: Node Dedup</h2>
-
-    <h3>Vấn đề</h3>
-    <p>Headscale tạo <strong>node mới</strong> mỗi khi machine key thay đổi (cài lại Tailscale, build mới từ source, thư mục state mới). Kết quả là nhiều node có cùng hostname nhưng <code>given_name</code> bị thêm hậu tố ngẫu nhiên, ví dụ:</p>
-    <pre><code>itop-thanhhn          &lt;- keeper (online)
-itop-thanhhn5-i8shta5a &lt;- trung (offline, can xoa)
-itop-thanhhn5-k9wqp2x &lt;- trung (offline, can xoa)</code></pre>
-
-    <h3>Logic dedup</h3>
-    <pre><code>Poll Headscale API (moi POLL_INTERVAL giay)
-    |
-    |-- Gom node theo (user, hostname)
-    |
-    |-- Voi moi nhom co &gt; 1 node:
-    |       Chon "keeper":
-    |         1. Uu tien node dang ONLINE
-    |         2. Neu tie: node co last_seen moi nhat
-    |         3. Neu van tie: node co id nho nhat
-    |
-    |-- Xoa tat ca node OFFLINE con lai trong nhom
-    |     (neu DRY_RUN=false)
-    |
-    |-- Doi given_name cua keeper ve hostname sach
-    |     (bo hau to, vi du: "itop-thanhhn5-i8shta5a" -&gt; "itop-thanhhn")
-    |     (neu DRY_RUN=false)
-    |
-    +-- Luu vao SQLite (bang devices)</code></pre>
+    <h2>Node Dedup</h2>
+    <p>Headscale tạo node mới mỗi khi machine key thay đổi (reinstall, state mới). Dedup gom theo <code>(user, hostname)</code>:</p>
+    <ul>
+      <li><strong>Keeper</strong>: ưu tiên ONLINE → last_seen mới nhất → id lớn nhất</li>
+      <li><strong>Xóa</strong>: node trùng OFFLINE (không bao giờ xóa node đang ONLINE)</li>
+      <li><strong>Rename</strong>: <code>given_name</code> → hostname sạch (bỏ hậu tố ngẫu nhiên)</li>
+    </ul>
+    <p>Sau mỗi poll, danh sách node được POST lên <code>api-center /api/devices/report</code> để lưu vào bảng <code>devices</code> trong Neon (lịch sử thiết bị, seen_count, MAC từ client report).</p>
     <div class="note"><strong>Idempotent:</strong> Chạy nhiều lần với cùng state Headscale cho cùng kết quả. An toàn để chạy liên tục.</div>
-
-    <h3>Lưu ý DRY_RUN</h3>
     <div class="warn"><code>DRY_RUN=true</code> — chỉ log hành động dự kiến, không gọi API xóa/đổi tên. Dùng khi debug hoặc kiểm tra trước khi đưa vào production.</div>
 
-    <h2>Phần 2: Collector (HTTP server)</h2>
-    <p>HTTP server lắng nghe port <code>8090</code>. <strong>Chỉ nhận request từ tailnet</strong> (IP-based auth, không dùng token).</p>
+    <h2>Server-side Ping</h2>
+    <pre><code>LocalAPI unix socket → ping từng node ONLINE → POST kết quả vào api-center
+→ Neon Postgres (latency_samples) → Admin-UI trang Latency</code></pre>
+    <p>Nguồn mặc định: <code>SRC_NAME="collector"</code>. Dữ liệu hiển thị trên Admin-UI trang Latency.</p>
 
-    <h3>Endpoints</h3>
-    <table>
-      <thead><tr><th>Method</th><th>Path</th><th>Mô tả</th></tr></thead>
-      <tbody>
-        <tr><td><code>POST</code></td><td><code>/metrics/report</code></td><td>Nhận báo cáo latency từ reporter (relay nodes) hoặc Windows client</td></tr>
-        <tr><td><code>GET</code></td><td><code>/metrics/latency</code></td><td>Trả aggregated latency JSON (trong <code>LATENCY_WINDOW</code> giây gần nhất)</td></tr>
-        <tr><td><code>GET</code></td><td><code>/metrics/health</code></td><td>Smoke gate sau deploy. Query params: <code>expect=collector,vpn3,vpn4</code>, <code>window=180</code></td></tr>
-        <tr><td><code>GET</code></td><td><code>/stats</code> hoặc <code>/metrics/stats</code></td><td>Dashboard HTML với Chart.js, auto-refresh 30s</td></tr>
-        <tr><td><code>GET</code></td><td><code>/derp</code> hoặc <code>/derp-status</code></td><td>DERP status page: probe kết quả + bảng peer relay</td></tr>
-        <tr><td><code>GET</code></td><td><code>/metrics/netcheck</code></td><td>Nhận netcheck từ client (POST netcheck)</td></tr>
-      </tbody>
-    </table>
-
-    <h3>Cấu trúc POST /metrics/report</h3>
-    <pre><code>{
-  "src": "vpn3",
-  "dst": "itop-thanhhn",
-  "dst_ip": "100.64.x.x",
-  "rtt_ms": 12.4,
-  "path": "direct",
-  "ok": true
-}</code></pre>
-
-    <h3>Auth model (IP-based)</h3>
-    <p>Collector chấp nhận request từ:</p>
-    <table>
-      <thead><tr><th>Dải IP</th><th>Nguồn</th></tr></thead>
-      <tbody>
-        <tr><td><code>100.64.0.0/10</code></td><td>Tailnet (IPv4)</td></tr>
-        <tr><td><code>fd7a::/16</code></td><td>Tailnet (IPv6)</td></tr>
-        <tr><td><code>127.0.0.0/8</code></td><td>Loopback</td></tr>
-        <tr><td><code>10.0.0.0/8</code></td><td>Docker network</td></tr>
-        <tr><td><code>172.16.0.0/12</code></td><td>Docker network</td></tr>
-        <tr><td><code>192.168.0.0/16</code></td><td>Docker network</td></tr>
-      </tbody>
-    </table>
-    <div class="note"><strong>Lý do chấp nhận Docker network:</strong> collector-sidecar dùng <code>socat</code> để forward port. <code>socat</code> làm mất IP gốc của caller, request đến collector có IP là Docker bridge network.</div>
-
-    <h3>GET /metrics/health</h3>
-    <p>Dùng làm smoke gate sau mỗi lần deploy. Ví dụ:</p>
-    <pre><code>GET /metrics/health?expect=collector,vpn3,vpn4&amp;window=180</code></pre>
-    <ul>
-      <li><code>expect</code>: danh sách <code>src</code> phải có báo cáo trong khoảng thời gian <code>window</code> giây.</li>
-      <li><code>window</code>: số giây tính ngược từ thời điểm hiện tại.</li>
-      <li>Trả <code>200 OK</code> nếu tất cả <code>expect</code> đều có báo cáo; trả <code>503</code> nếu thiếu.</li>
-    </ul>
-
-    <h2>Phần 3: Auto-approve Routes</h2>
-    <p>Tự động duyệt mọi route mà node advertise qua Headscale API. Không cần tag đặc biệt, không cần duyệt tay qua CLI.</p>
-    <div class="note"><strong>Idempotent:</strong> Route đã approved không bị thay đổi. Chỉ approve route mới chưa được duyệt.</div>
-
-    <h2>Server Ping</h2>
-    <p>Ngoài việc nhận báo cáo từ relay nodes, latency module còn <strong>tự ping</strong> tất cả node ONLINE qua LocalAPI của collector-sidecar.</p>
-    <pre><code>latency module
-    |
-    +-- ts_sock volume -&gt; /var/run/tailscale/tailscaled.sock (cua collector-sidecar)
-            |
-            |-- GET /localapi/v0/status -&gt; danh sach peer online
-            +-- POST /localapi/v0/ping?ip=X&amp;type=disco -&gt; RTT
-                    -&gt; luu vao node_latency voi src="collector"</code></pre>
-
-    <h2>SQLite Database</h2>
-    <p>File: <code>/data/devices.db</code></p>
-
-    <h3>Bảng <code>devices</code></h3>
-    <p>Lưu lịch sử node dedup.</p>
-    <table>
-      <thead><tr><th>Cột</th><th>Kiểu</th><th>Ghi chú</th></tr></thead>
-      <tbody>
-        <tr><td><code>user</code></td><td>TEXT</td><td>PRIMARY KEY (cùng <code>hostname</code>)</td></tr>
-        <tr><td><code>hostname</code></td><td>TEXT</td><td>PRIMARY KEY</td></tr>
-        <tr><td><code>mac</code></td><td>TEXT</td><td>MAC address (từ Windows client report)</td></tr>
-        <tr><td><code>node_id</code></td><td>TEXT</td><td>Headscale node ID của keeper</td></tr>
-        <tr><td><code>ipv4</code></td><td>TEXT</td><td>Tailnet IPv4</td></tr>
-        <tr><td><code>machine_key</code></td><td>TEXT</td><td>Machine key hiện tại</td></tr>
-        <tr><td><code>first_seen</code></td><td>DATETIME</td><td>Lần đầu xuất hiện</td></tr>
-        <tr><td><code>last_seen</code></td><td>DATETIME</td><td>Lần cuối seen</td></tr>
-        <tr><td><code>seen_count</code></td><td>INTEGER</td><td>Tổng số lần thấy</td></tr>
-      </tbody>
-    </table>
-
-    <h3>Bảng <code>node_latency</code></h3>
-    <p>Lưu toàn bộ kết quả ping/latency.</p>
-    <table>
-      <thead><tr><th>Cột</th><th>Kiểu</th><th>Ghi chú</th></tr></thead>
-      <tbody>
-        <tr><td><code>id</code></td><td>INTEGER</td><td>PK autoincrement</td></tr>
-        <tr><td><code>ts</code></td><td>DATETIME</td><td>Timestamp</td></tr>
-        <tr><td><code>src</code></td><td>TEXT</td><td>Nguồn ping (tên relay node hoặc "collector")</td></tr>
-        <tr><td><code>dst</code></td><td>TEXT</td><td>Hostname đích</td></tr>
-        <tr><td><code>dst_ip</code></td><td>TEXT</td><td>Tailnet IP đích</td></tr>
-        <tr><td><code>rtt_ms</code></td><td>REAL</td><td>Round-trip time (ms)</td></tr>
-        <tr><td><code>path</code></td><td>TEXT</td><td>"direct" hoặc "derp-vpnX"</td></tr>
-        <tr><td><code>ok</code></td><td>BOOLEAN</td><td>Ping thành công hay không</td></tr>
-      </tbody>
-    </table>
-    <p>Index trên cột <code>ts</code> để query nhanh theo time window.</p>
-
-    <h3>Bảng <code>client_netcheck</code></h3>
-    <p>Lưu kết quả netcheck từ Windows client.</p>
-    <table>
-      <thead><tr><th>Cột</th><th>Kiểu</th><th>Ghi chú</th></tr></thead>
-      <tbody>
-        <tr><td><code>id</code></td><td>INTEGER</td><td>PK autoincrement</td></tr>
-        <tr><td><code>ts</code></td><td>DATETIME</td><td>Timestamp</td></tr>
-        <tr><td><code>client</code></td><td>TEXT</td><td>Hostname của Windows client</td></tr>
-        <tr><td><code>preferred_derp</code></td><td>TEXT</td><td>DERP region được chọn</td></tr>
-        <tr><td><code>region_latency</code></td><td>JSON</td><td>Map region → latency ms</td></tr>
-      </tbody>
-    </table>
+    <h2>Auto-approve Routes</h2>
+    <p>Gọi <code>POST /api/v1/node/{id}/approve_routes</code> cho mọi route chưa được duyệt. Idempotent — an toàn chạy lặp lại.</p>
 
     <h2>Environment Variables</h2>
     <table>
       <thead><tr><th>Biến</th><th>Mặc định</th><th>Bắt buộc</th><th>Mô tả</th></tr></thead>
       <tbody>
-        <tr><td><code>HS_API_URL</code></td><td>—</td><td>Có</td><td>URL Headscale API (ví dụ: <code>http://derp-controller:8080</code>)</td></tr>
+        <tr><td><code>HS_API_URL</code></td><td><code>http://derp-controller:8080</code></td><td>Có</td><td>URL Headscale API</td></tr>
         <tr><td><code>HS_API_KEY</code></td><td>—</td><td>Có</td><td>Headscale API key</td></tr>
+        <tr><td><code>API_CENTER_URL</code></td><td><code>http://api-center:8787</code></td><td>Có</td><td>URL api-center để POST devices/report và metrics/report</td></tr>
         <tr><td><code>POLL_INTERVAL</code></td><td><code>30</code></td><td>Không</td><td>Chu kỳ dedup + auto-approve + server ping (giây)</td></tr>
-        <tr><td><code>DB_PATH</code></td><td><code>/data/devices.db</code></td><td>Không</td><td>Đường dẫn SQLite database</td></tr>
-        <tr><td><code>DRY_RUN</code></td><td><code>false</code></td><td>Không</td><td><code>true</code> = chỉ log, không xóa/đổi tên node</td></tr>
+        <tr><td><code>DRY_RUN</code></td><td><code>false</code></td><td>Không</td><td><code>true</code> = chỉ log, không xóa/đổi tên node thật</td></tr>
         <tr><td><code>AUTO_APPROVE_ROUTES</code></td><td><code>true</code></td><td>Không</td><td><code>true</code> = tự động approve route</td></tr>
-        <tr><td><code>METRICS_PORT</code></td><td><code>8090</code></td><td>Không</td><td>Port HTTP collector</td></tr>
         <tr><td><code>TS_SOCKET</code></td><td><code>/var/run/tailscale/tailscaled.sock</code></td><td>Không</td><td>Unix socket của collector-sidecar (ts_sock volume)</td></tr>
-        <tr><td><code>SRC_NAME</code></td><td><code>collector</code></td><td>Không</td><td>Tên <code>src</code> dùng khi collector-sidecar tự ping</td></tr>
-        <tr><td><code>DERP_PROBE_URLS</code></td><td>—</td><td>Không</td><td>Comma-separated <code>name=url</code> probe endpoints của DERP nodes</td></tr>
-        <tr><td><code>LATENCY_WINDOW</code></td><td><code>3600</code></td><td>Không</td><td>Số giây lấy samples cho <code>/metrics/latency</code></td></tr>
+        <tr><td><code>SRC_NAME</code></td><td><code>collector</code></td><td>Không</td><td>Tên nguồn khi ghi ping samples vào api-center</td></tr>
       </tbody>
     </table>
 
-    <h3>DERP_PROBE_URLS format</h3>
-    <pre><code>vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe,vpn4-vn=https://vpn4.hangocthanh.io.vn/derp/probe,vpn6-vn=https://vpn6.hangocthanh.io.vn/derp/probe</code></pre>
-
     <h2>Volumes</h2>
-    <pre><code>volumes:
-  - latency_data:/data                                  # SQLite DB
-  - ts_sock:/var/run/tailscale                          # Chia se voi collector-sidecar</code></pre>
+    <table>
+      <thead><tr><th>Volume</th><th>Mount</th><th>Dùng cho</th></tr></thead>
+      <tbody>
+        <tr><td><code>ts_sock</code></td><td><code>/var/run/tailscale</code></td><td>Shared với collector-sidecar — LocalAPI để ping node</td></tr>
+      </tbody>
+    </table>
+    <div class="note"><strong>Không còn</strong> <code>latency_data:/data</code> — SQLite đã được xóa hoàn toàn. Không cần migration, không cần backup.</div>
 
-    <h2>COUPLING quan trọng</h2>
-    <div class="warn">
-      <strong>latency + collector-sidecar PHẢI chạy cùng host</strong> vì chia sẻ volume <code>ts_sock</code>.
-      <ul style="margin-top:8px;">
-        <li><code>latency</code> cần đọc unix socket của <code>collector-sidecar</code> để gọi LocalAPI (server ping).</li>
-        <li><code>collector-sidecar</code> dùng <code>socat</code> để forward traffic từ tailnet vào <code>latency:8090</code>.</li>
-        <li>Nếu di chuyển sang host khác, <strong>phải di chuyển cả hai</strong> cùng lúc. Không thể tách rời.</li>
-      </ul>
-    </div>
+    <h2>Coupling: collector-sidecar</h2>
+    <p>Latency module <strong>bắt buộc</strong> chạy cùng host với collector-sidecar vì chia sẻ unix socket <code>ts_sock</code>. Nếu di chuyển, di chuyển cả 2 cùng lúc.</p>
 
-    <h2>Lưu ý quan trọng</h2>
-    <div class="warn">
-      <ul>
-        <li><strong>Port 8090 không được expose ra internet.</strong> Chỉ lắng nghe trong tailnet. collector-sidecar chịu trách nhiệm nhận traffic từ tailnet và forward vào.</li>
-        <li><strong>Database migration:</strong> Khi cập nhật schema SQLite, cần migration script hoặc xóa và recreate DB (mất lịch sử). Nên backup <code>/data/devices.db</code> trước khi update image.</li>
-        <li><strong>DERP_PROBE_URLS:</strong> Nếu không set, <code>/derp-status</code> vẫn hoạt động nhưng không có kết quả probe. Cần update khi thêm/bớt relay node.</li>
-        <li><strong>Headscale API key rotation:</strong> Khi đổi <code>HS_API_KEY</code>, restart latency container. Key cũ không còn dùng được ngay lập tức.</li>
-      </ul>
-    </div>
+    <h2>Server Migration</h2>
+    <ol>
+      <li>Đảm bảo <code>ts_sock</code> volume chuyển cùng với collector-sidecar.</li>
+      <li><code>API_CENTER_URL</code> phải resolve đến api-center.</li>
+      <li><code>HS_API_URL</code> phải trỏ đến derp-controller.</li>
+      <li>Không cần di chuyển data — Neon Postgres là centralized, không local.</li>
+      <li>Cập nhật docker-compose trên server mới.</li>
+    </ol>
+
+    <h2>Logs</h2>
+    <pre><code>2026-01-01T12:00:00 node-dedup chay. API=http://derp-controller:8080 poll=30s DRY_RUN=False
+2026-01-01T12:00:01 server ping: 5/6 node OK
+2026-01-01T12:00:31 APPROVE-ROUTES node 42 -&gt; ['192.168.1.0/24']
+2026-01-01T12:01:01 DELETE itop-user-abc123 -&gt; trung hostname 'itop' (user admin)</code></pre>
   </main>
 </body>
 </html>

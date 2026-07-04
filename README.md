@@ -64,7 +64,7 @@ Internet
 - Quản lý: DERP nodes, derpmap.json, node assignments, force routes, latency data, ACL, pre-auth keys, users, machines, headscale API key
 - Google OAuth session auth (không dùng oauth2-proxy)
 - **Endpoints quan trọng:**
-  - `GET /derpmap.json` → DERP-Controller fetch mỗi 10s
+  - `GET /derpmap.json` → public, no-auth; DERP-Controller fetch mỗi 10s, và cũng là nguồn duy nhất cho job `discover` của `module-derp-relay.yml` (CI đọc qua route Caddy `/derpmap.json` trên vpn2, không cần credential DB)
   - `POST /api/metrics/report` → Client Mod + DERP Relay gửi latency
   - `GET /api/internal/derp-map/:nodeKey` → DERP-Controller Feature B
   - `GET /api/nodes`, `DELETE /api/nodes/:id`, ... → quản lý node
@@ -198,7 +198,7 @@ Mỗi module có workflow riêng, trigger theo path:
 |---|---|---|
 | `module-admin-ui.yml` | `modules/admin-ui/**` | vpn2 (admin-ui container) |
 | `module-api-center.yml` | `modules/api-center/**`, `contracts/**` | vpn2 (api-center container) |
-| `module-derp-relay.yml` | `modules/derp-relay/**`, `contracts/**` | vpn2 + vpn3 + vpn4 + vpn6 |
+| `module-derp-relay.yml` | `modules/derp-relay/**`, `contracts/**` | vpn2 (job riêng) + mọi relay node khám phá từ `/derpmap.json` (job `discover` → matrix `deploy-relay`) |
 | `module-latency.yml` | `modules/latency/**` | vpn2 (latency container) |
 | `module-collector-sidecar.yml` | `modules/collector-sidecar/**` | vpn2 (collector-sidecar) |
 | `deploy-vpn2.yml` | Manual trigger | Full stack vpn2 |
@@ -211,6 +211,16 @@ Khi `contracts/api-center.json` thay đổi:
 - `module-derp-relay.yml` verify reporter.py vẫn gửi đúng fields
 
 Mỗi module deploy **độc lập** — thay đổi Admin-UI không restart Api-center, thay đổi DERP Relay không ảnh hưởng Latency.
+
+### `module-derp-relay.yml` — deploy động qua discover-from-DB (không còn hardcode vpn3/vpn4/vpn6)
+
+Workflow không còn 1 job deploy riêng cho từng node. Thay vào đó:
+
+1. **`discover`** — fetch `GET /derpmap.json` (mặc định `https://vpn2.hangocthanh.io.vn/derpmap.json`, override bằng repo variable `DERPMAP_URL`) và dựng ra một **matrix** gồm mọi relay node đang active trong bảng `derp_servers` (Neon) — trừ node `embedded` (vpn2).
+2. **`deploy-relay`** (matrix job) — với mỗi node phát hiện được, tra secret SSH theo quy ước `VPN{N}_HOST/_USER/_SSH_KEY` (N = chữ số trong tên node, ví dụ `vpn3` → `VPN3_*`), rồi SSH deploy với `DERP_HOSTNAME`/`REPORTER_NAME` lấy thẳng từ derpmap. Node nào thiếu secret sẽ bị bỏ qua (cảnh báo, không fail cả workflow).
+3. **`deploy-vpn2`** vẫn là job riêng vì vpn2 là node control/embedded, không nằm trong `derp_servers`.
+
+**Thêm relay node mới = thêm vào DB + khai 3 secret `VPN{N}_*`** — không cần sửa file workflow. Xem [docs/deploy/relay-nodes.md](docs/deploy/relay-nodes.md) và [docs/deploy/secrets.md](docs/deploy/secrets.md).
 
 ---
 
@@ -229,9 +239,7 @@ Mỗi module deploy **độc lập** — thay đổi Admin-UI không restart Api
 | `VPN2_HOST` | Deploy workflows | IP vpn2 |
 | `VPN2_USER` | Deploy workflows | SSH user vpn2 |
 | `VPN2_SSH_KEY` | Deploy workflows | SSH private key vpn2 |
-| `VPN3_HOST/USER/SSH_KEY` | derp-relay workflow | vpn3 deploy |
-| `VPN4_HOST/USER/SSH_KEY` | derp-relay workflow | vpn4 deploy |
-| `VPN6_HOST/USER/SSH_KEY` | derp-relay workflow | vpn6 deploy |
+| `VPN{N}_HOST/USER/SSH_KEY` | derp-relay workflow (`deploy-relay` matrix job) | Tra động theo node khám phá từ `/derpmap.json`, N = chữ số trong tên node — ví dụ `VPN3_*` cho vpn3, `VPN4_*` cho vpn4, `VPN6_*` cho vpn6 (không cần sửa workflow khi thêm node mới) |
 
 ---
 
@@ -350,7 +358,11 @@ docker compose exec api-center wget -qO- http://localhost:8787/healthz
 
 ---
 
-## Cách deploy relay node mới (vpn3/4/6)
+## Cách deploy relay node mới (vpn3/4/6...)
+
+Cách khuyến nghị: thêm node vào DB qua Admin-UI (**DERP Regions → Add Region**) rồi khai secret `VPN{N}_HOST/_USER/_SSH_KEY` — job `discover` của `module-derp-relay.yml` sẽ tự phát hiện node qua `/derpmap.json` và deploy ở lần chạy tiếp theo, không cần sửa workflow. Chi tiết: [docs/deploy/relay-nodes.md](docs/deploy/relay-nodes.md).
+
+Deploy thủ công (không qua CI) vẫn dùng được khi cần:
 
 ```bash
 ssh user@vpnX

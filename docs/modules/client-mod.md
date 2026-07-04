@@ -189,7 +189,10 @@ collector:8090
 100.64.x.x:8090  (Tailnet IP của collector-sidecar)
     │ socat trong collector-sidecar
     ▼
-latency:8090  (Docker network trên vpn2)
+api-center:8787  (Docker network trên vpn2)
+    │ POST /api/metrics/report
+    ▼
+Neon Postgres (latency_samples)
 ```
 
 Nếu `collector-sidecar` offline, report thất bại silently (goroutine log error và tiếp tục đến lần tiếp theo sau 30s). Không ảnh hưởng hoạt động Tailscale cốt lõi.

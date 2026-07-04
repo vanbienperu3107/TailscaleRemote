@@ -64,6 +64,16 @@ docker exec derp-controller headscale preauthkeys list -u main
 
 ## Bước 2 — Set GitHub Secrets (chỉ cần cho relay node có CI deploy)
 
+Workflow `module-derp-relay.yml` **không còn hardcode danh sách node** trong file YAML. Thay vào đó, job `discover` fetch `/derpmap.json` (public, dựng từ bảng `derp_servers` trên Neon) và tự sinh ra matrix relay node cần deploy. Với mỗi node phát hiện được, job `deploy-relay` tra secret SSH theo quy ước:
+
+```text
+VPN{N}_HOST      # IP hoặc domain SSH tới node
+VPN{N}_USER      # user SSH (thường là root)
+VPN{N}_SSH_KEY   # private key SSH
+```
+
+trong đó `{N}` là chữ số trong tên node (`Name` trong derpmap), ví dụ `vpn3` → `VPN3_*`, `vpn4` → `VPN4_*`. **Chỉ cần thêm node vào DB (qua Admin-UI hoặc API) và khai đủ 3 secret tương ứng — không cần sửa file workflow.** Node thiếu secret sẽ bị job cảnh báo (`::warning::`) và bỏ qua, không làm fail cả workflow.
+
 Mẫu cho vpn3 (đã cấu hình sẵn):
 
 ```powershell
@@ -73,7 +83,7 @@ gh secret set VPN3_USER --body "root"
 gh secret set VPN3_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\vpn3_key" -Raw)
 ```
 
-Cho relay node mới (ví dụ vpn4):
+Cho relay node mới (ví dụ vpn4) — sau khi đã thêm node vào DB qua Admin-UI (xem Bước 6):
 
 ```powershell
 gh secret set VPN4_HOST --body "IP_CUA_VPN4"
@@ -81,16 +91,21 @@ gh secret set VPN4_USER --body "root"
 gh secret set VPN4_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\vpn4_key" -Raw)
 ```
 
+Xem chi tiết toàn bộ secret ở [docs/deploy/secrets.md](secrets.md).
+
 ---
 
 ## Bước 3 — Deploy tự động qua GitHub Actions (cách khuyến nghị)
 
-Workflow `module-derp-relay.yml` tự động build + deploy lên vpn3 khi có thay đổi trong `modules/derp-relay/`.
+Workflow `module-derp-relay.yml` build image, sau đó:
 
-Trigger thủ công:
+1. **`discover`** — `curl` `${DERPMAP_URL}` (mặc định `https://vpn2.hangocthanh.io.vn/derpmap.json`, override bằng repo variable `DERPMAP_URL`), lọc các node trong `Regions[].Nodes[]`, dựng GitHub Actions matrix `{name, hostname, num}`.
+2. **`deploy-relay`** (matrix job) — với mỗi node trong matrix, deploy song song (mỗi node độc lập, một node lỗi không chặn node khác nhờ `fail-fast: false` + `continue-on-error: true`).
+3. **`deploy-vpn2`** — job riêng, luôn chạy vì vpn2 là node control/embedded, không nằm trong `derp_servers`/`/derpmap.json`.
+
+Trigger thủ công (deploy toàn bộ node đang active trong DB):
 
 ```powershell
-# Deploy derp-relay lên vpn3:
 gh workflow run module-derp-relay.yml
 
 # Theo dõi:
@@ -98,12 +113,13 @@ gh run list --workflow=module-derp-relay.yml
 gh run view <RUN_ID> --log
 ```
 
-Workflow sẽ:
-1. Build image `ghcr.io/vanbienperu3107/derp-relay:latest`
+Workflow sẽ, cho mỗi relay node phát hiện từ `/derpmap.json`:
+
+1. Build image `ghcr.io/vanbienperu3107/derp-relay:latest` (một lần, dùng chung)
 2. Push lên GHCR
-3. SSH vào vpn3
-4. `docker compose pull && docker compose up -d`
-5. `curl http://localhost:8080/derp/probe` để kiểm tra
+3. SSH vào node bằng secret `VPN{N}_HOST/_USER/_SSH_KEY`
+4. `DERP_HOSTNAME=... REPORTER_NAME=... docker compose pull && docker compose up -d --force-recreate`
+5. (Kiểm tra thủ công sau đó) `curl https://<domain>/derp/probe`
 
 ---
 
@@ -295,21 +311,6 @@ Status:      Active
 6. Headscale pull derpmap mỗi 10s → client nhận DERPMap mới
 
 ---
-
-## Bước 7 — Cập nhật DERP probe URLs cho latency monitor
-
-Secret `DERP_PROBE_URLS` chứa danh sách các relay node để `latency` module monitor:
-
-```powershell
-# Format: "region-code=probe-url,region-code=probe-url,..."
-gh secret set DERP_PROBE_URLS --body "vpn2-vn=https://vpn2.hangocthanh.io.vn/derp/probe,vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe,vpn4-vn=https://vpn4.hangocthanh.io.vn/derp/probe"
-```
-
-Re-deploy latency module để nhận cấu hình mới:
-
-```powershell
-gh workflow run module-latency.yml
-```
 
 ---
 

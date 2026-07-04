@@ -116,10 +116,6 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy</code></pre>
   handle /generate_204   { respond 204 }
   handle /app/api/*      { reverse_proxy api-center:8787 }
   handle /app/*          { reverse_proxy admin-ui:80 }
-  handle /derp-status*   {
-    uri strip_prefix /derp-status
-    reverse_proxy latency:8090
-  }
   @root path /
   handle @root { redir * /app/ 302 }
   handle { reverse_proxy derp-controller:8080 }
@@ -139,7 +135,6 @@ COPY --from=builder /usr/bin/caddy /usr/bin/caddy</code></pre>
         <tr><td><code>/generate_204</code></td><td>—</td><td>—</td><td>Connectivity check, trả <code>204 No Content</code></td></tr>
         <tr><td><code>/app/api/*</code></td><td><code>api-center</code></td><td><code>8787</code></td><td>Backend API của dashboard</td></tr>
         <tr><td><code>/app/*</code></td><td><code>admin-ui</code></td><td><code>80</code></td><td>Frontend dashboard (SPA)</td></tr>
-        <tr><td><code>/derp-status*</code></td><td><code>latency</code></td><td><code>8090</code></td><td>DERP status page (strip prefix <code>/derp-status</code>)</td></tr>
         <tr><td><code>/</code> (exact)</td><td>—</td><td>—</td><td>Redirect <code>302</code> → <code>/app/</code></td></tr>
         <tr><td><code>*</code> (fallback)</td><td><code>derp-controller</code></td><td><code>8080</code></td><td>Mọi path không khớp → Headscale</td></tr>
       </tbody>

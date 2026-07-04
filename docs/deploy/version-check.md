@@ -377,14 +377,7 @@ cd /opt/tailscale-remote/deploy/vpn2
 docker exec derp-controller \
   cat /etc/headscale-keys/noise_private.key > /tmp/noise_private.key.backup
 
-# Backup latency DB:
-docker run --rm \
-  -v latency_data:/data \
-  -v /tmp:/backup \
-  alpine cp /data/devices.db /backup/devices.db.backup
-
 scp root@165.22.12.169:/tmp/noise_private.key.backup .
-scp root@165.22.12.169:/tmp/devices.db.backup .
 
 # 2. Cập nhật GitHub Secrets với IP mới:
 gh secret set VPN2_HOST --body "NEW_VPS_IP"
@@ -394,17 +387,9 @@ gh secret set VPN2_SSH_KEY --body (Get-Content "C:\Users\Hoanglong\keys\new_vps_
 
 # 4. Deploy:
 gh workflow run deploy-control-plane.yml -f confirm=deploy -f target=vpn2
+# Latency data (devices, latency_samples) lưu trên Neon Postgres — không cần restore local.
 
-# 5. Restore latency DB (nếu cần giữ historical data):
-scp devices.db.backup root@NEW_VPS_IP:/tmp/
-ssh root@NEW_VPS_IP
-docker run --rm \
-  -v latency_data:/data \
-  -v /tmp:/backup \
-  alpine cp /backup/devices.db.backup /data/devices.db
-docker restart latency
-
-# 6. Cập nhật Cloudflare LB pool:
+# 5. Cập nhật Cloudflare LB pool:
 # DNS → Load Balancing → pool → thay IP vpn2 cũ = IP mới
 
 # 7. Kiểm tra:

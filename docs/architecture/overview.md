@@ -23,7 +23,7 @@
 | 2 | `api-center` | `modules/api-center` | Fastify API hub — REST API cho admin-ui, Google OAuth, quản lý DERP node DB, proxy tới headscale | vpn2 + vpn6 (HA) |
 | 3 | `admin-ui` | `modules/admin-ui` | React dashboard — giao diện quản lý DERP regions, nodes, latency, user | vpn2 + vpn6 (HA) |
 | 4 | `derp-relay` | `modules/derp-relay` | DERP relay WebSocket + STUN + ping-reporter gửi latency về collector | vpn2, vpn3, vpn4, vpn6 |
-| 5 | `latency` | `modules/latency` | node-dedup + latency collector server + metrics SQLite DB | vpn2 only |
+| 5 | `latency` | `modules/latency` | node-dedup + server ping + auto-approve routes — ghi vào Neon via api-center | vpn2 only |
 | 6 | `collector-sidecar` | `modules/collector-sidecar` | Tailscale daemon + socat bridge — join tailnet để ping-reporter trên relay node khác kết nối được | vpn2 only (cùng host latency) |
 | 7 | `gateway` | `modules/gateway` | Caddy reverse proxy — TLS termination, routing tới tất cả service | vpn2 only |
 | 8 | `exit-node` | `modules/exit-node` | gost SOCKS5/HTTP proxy standalone — join tailnet rồi cung cấp exit proxy | Bất kỳ VPS |
@@ -65,7 +65,7 @@ Gateway (Caddy)                               Caddy (system install + snippet)
 vpn3 (64.176.23.196) — Standalone DERP Relay
   domain: vpn3.hangocthanh.io.vn
   └─ derp-relay container (DERP WebSocket + STUN)
-     └─ ping-reporter → tailnet → collector:8090 (vpn2)
+     └─ ping-reporter → tailnet → collector:8090 → socat → api-center:8787 (vpn2)
 
 vpn4 — Standalone DERP Relay (tương tự vpn3)
 
@@ -124,8 +124,8 @@ derp-relay container (vpn3/vpn4)
         → tailnet (qua Tailscale IP)
         → collector-sidecar:8090 trên vpn2
         → socat bridge
-        → latency service :8090
-        → ghi vào SQLite /data/devices.db
+        → api-center:8787
+        → Neon Postgres (latency_samples)
 ```
 
 ---
@@ -137,7 +137,8 @@ latency service (vpn2)
     → unix socket ts_sock (shared volume)
     → Tailscale LocalAPI
     → ping tới mọi peer trong tailnet
-    → ghi kết quả vào SQLite
+    → POST api-center:8787/api/metrics/report
+    → Neon Postgres (latency_samples)
 ```
 
 ---
@@ -148,7 +149,8 @@ latency service (vpn2)
 client-mod (Windows)
     → kết nối tailnet
     → collector:8090 trên vpn2 (qua tailnet IP)
-    → latency DB update
+    → socat bridge → api-center:8787/api/metrics/report
+    → Neon Postgres (latency_samples)
 ```
 
 ---
@@ -182,7 +184,6 @@ Tailscale client (nodeKey cụ thể)
 | Volume | Mount trong container | Mục đích |
 |--------|-----------------------|----------|
 | `derp_relay_certs` | `/certs` (derp-relay) | TLS certificates cho DERP relay |
-| `latency_data` | `/data` (latency) | SQLite database `/data/devices.db` |
 | `collector_state` | `/var/lib/tailscale` (collector-sidecar) | Tailscale daemon state |
 | `ts_sock` | `/ts_sock` (latency + collector-sidecar) | Unix socket chia sẻ LocalAPI |
 | `derp_controller_run` | `/var/run/headscale` (derp-controller) | Headscale runtime files, socket |
@@ -247,6 +248,16 @@ Health check: HTTPS GET /healthz
 Failover: automatic, DNS TTL 30s
 ```
 
+### 7.6 module-derp-relay.yml — discover-from-DB thay vì hardcode node
+
+Workflow không còn định nghĩa cứng `deploy-vpn3`/`deploy-vpn4`/`deploy-vpn6`. Thay vào đó:
+
+- **`discover`**: `curl` `/derpmap.json` (mặc định `https://vpn2.hangocthanh.io.vn/derpmap.json`, override qua repo variable `DERPMAP_URL`) — endpoint public do api-center dựng từ bảng `derp_servers` (Neon), chỉ gồm node `enabled && !paused && !embedded`. Kết quả build thành GitHub Actions matrix `{name, hostname, num}` (num = chữ số trong tên node).
+- **`deploy-relay`** (matrix job): với mỗi node, tra secret SSH theo quy ước `VPN{num}_HOST/_USER/_SSH_KEY`. Thiếu secret → job cảnh báo và bỏ qua node đó (không fail toàn bộ workflow).
+- **`deploy-vpn2`**: vẫn tách riêng vì vpn2 là node control/embedded, không nằm trong `derp_servers`.
+
+Hệ quả: **thêm một relay node mới chỉ cần thêm vào DB (qua Admin-UI) + khai 3 secret `VPN{N}_*`** — không phải sửa file workflow. `/derpmap.json` vừa là nguồn DERPMap cho headscale, vừa là nguồn duy nhất cho CI xác định tập relay node cần deploy.
+
 ---
 
 ## 8. CI/CD flow
@@ -283,7 +294,7 @@ Workflow modules riêng:
 | `module-derp-controller.yml` | push `modules/derp-controller/**` | build + push GHCR |
 | `module-api-center.yml` | push `modules/api-center/**` | build + push GHCR |
 | `module-admin-ui.yml` | push `modules/admin-ui/**` | build + push GHCR |
-| `module-derp-relay.yml` | push `modules/derp-relay/**` | build + push + deploy vpn3 |
+| `module-derp-relay.yml` | push `modules/derp-relay/**` | build + push GHCR; job `discover` fetch `/derpmap.json` → matrix `deploy-relay` deploy tới mọi relay node active trong DB (không hardcode vpn3/vpn4/vpn6); job `deploy-vpn2` riêng cho node embedded |
 | `module-latency.yml` | push `modules/latency/**` | build + push GHCR |
 | `module-collector-sidecar.yml` | push `modules/collector-sidecar/**` | build + push GHCR |
 | `module-gateway.yml` | push `modules/gateway/**` | build + push GHCR |

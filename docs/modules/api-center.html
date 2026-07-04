@@ -300,7 +300,7 @@
     </tbody>
   </table>
 
-  <h3>Latency &amp; Metrics</h3>
+  <h3>Latency, Devices &amp; Metrics</h3>
   <table>
     <thead>
       <tr><th>Method</th><th>Path</th><th>Auth</th><th>Mô tả</th></tr>
@@ -316,11 +316,41 @@
         <td><span class="method post">POST</span></td>
         <td><code>/api/metrics/report</code></td>
         <td><span class="badge badge-yellow">IP-based</span></td>
-        <td>Nhận latency report từ Client Mod + DERP Relay</td>
+        <td>Nhận latency report từ Client Mod, DERP Relay và latency module</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/metrics/netcheck</code></td>
+        <td><span class="badge badge-yellow">IP-based</span></td>
+        <td>Nhận <code>tailscale netcheck</code> result từ client, UPSERT theo hostname</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/metrics/health</code></td>
+        <td><span class="badge badge-gray">Public</span></td>
+        <td>Smoke gate sau deploy — <code>?expect=collector,vpn3&amp;window=180</code> → 200/503</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/devices</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Danh sách thiết bị từ node dedup history (latency module ghi)</td>
+      </tr>
+      <tr>
+        <td><span class="method post">POST</span></td>
+        <td><code>/api/devices/report</code></td>
+        <td><span class="badge badge-yellow">IP-based</span></td>
+        <td>Latency module upsert device info sau mỗi poll headscale API</td>
+      </tr>
+      <tr>
+        <td><span class="method get">GET</span></td>
+        <td><code>/api/netcheck</code></td>
+        <td><span class="badge badge-blue">Required</span></td>
+        <td>Latest <code>tailscale netcheck</code> per client</td>
       </tr>
     </tbody>
   </table>
-  <div class="note">Auth cho <code>/api/metrics/report</code>: IP trong tailnet (100.x.x.x) hoặc Docker internal network. Không cần OAuth session.</div>
+  <div class="note">Auth cho <code>/api/metrics/report</code>, <code>/api/metrics/netcheck</code>, <code>/api/devices/report</code>: IP trong tailnet (100.x.x.x) hoặc Docker internal network. Không cần OAuth session.</div>
 
   <h3>Force Routes</h3>
   <table>
@@ -473,7 +503,40 @@
       <tr><td><code>reportedAt</code></td><td>timestamp</td></tr>
     </tbody>
   </table>
-  <p>UPSERT mỗi lần nhận report → giữ bản mới nhất.</p>
+  <p>UPSERT mỗi lần nhận report → giữ bản mới nhất. Nguồn: client (metrics-report.ps1), relay nodes (reporter.py), latency module (server ping via collector).</p>
+
+  <h3><code>devices</code></h3>
+  <table>
+    <thead>
+      <tr><th>Column</th><th>Type</th><th>Ghi chú</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>userName</code></td><td>text (PK part)</td><td>Tailnet user</td></tr>
+      <tr><td><code>hostname</code></td><td>text (PK part)</td><td>Node hostname (composite PK với userName)</td></tr>
+      <tr><td><code>mac</code></td><td>text nullable</td><td>MAC address (từ Windows client report)</td></tr>
+      <tr><td><code>nodeId</code></td><td>text</td><td>Headscale node ID của keeper</td></tr>
+      <tr><td><code>ipv4</code></td><td>text</td><td>Tailnet IPv4</td></tr>
+      <tr><td><code>machineKey</code></td><td>text</td><td>Machine key hiện tại</td></tr>
+      <tr><td><code>firstSeen</code></td><td>timestamptz</td><td>Lần đầu xuất hiện</td></tr>
+      <tr><td><code>lastSeen</code></td><td>timestamptz</td><td>Lần cuối seen</td></tr>
+      <tr><td><code>seenCount</code></td><td>integer</td><td>Tổng số lần thấy, tăng mỗi poll</td></tr>
+    </tbody>
+  </table>
+  <p>Thay thế SQLite <code>devices.db</code> cũ. Ghi bởi latency module sau mỗi poll headscale API.</p>
+
+  <h3><code>client_netcheck</code></h3>
+  <table>
+    <thead>
+      <tr><th>Column</th><th>Type</th><th>Ghi chú</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>client</code></td><td>text PK</td><td>Hostname của client</td></tr>
+      <tr><td><code>preferredDerp</code></td><td>text</td><td>DERP region được chọn</td></tr>
+      <tr><td><code>regionLatency</code></td><td>text (JSON)</td><td>Map <code>{regionCode: ms}</code></td></tr>
+      <tr><td><code>reportedAt</code></td><td>timestamptz</td><td>Lần báo cáo mới nhất</td></tr>
+    </tbody>
+  </table>
+  <p>Latest <code>tailscale netcheck</code> per client. UPSERT theo hostname.</p>
 
   <h3>Các bảng khác</h3>
   <table>

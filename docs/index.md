@@ -11,7 +11,7 @@ Monorepo hạ tầng Tailscale tự host: DERP management, latency monitoring, H
 | [modules/api-center.md](modules/api-center.md) | API hub trung tâm — endpoints, DB schema, env vars |
 | [modules/admin-ui.md](modules/admin-ui.md) | Dashboard React — trang, tính năng, routing |
 | [modules/derp-relay.md](modules/derp-relay.md) | DERP relay + ping-reporter |
-| [modules/latency.md](modules/latency.md) | Collector HTTP, node-dedup, SQLite schema |
+| [modules/latency.md](modules/latency.md) | Node dedup, server ping, auto-approve routes — ghi vào api-center/Neon |
 | [modules/collector-sidecar.md](modules/collector-sidecar.md) | Tailscale join + socat port forward |
 | [modules/gateway.md](modules/gateway.md) | Caddy — routing table vpn2 và vpn6 |
 | [modules/exit-node.md](modules/exit-node.md) | Standalone proxy node (SOCKS5 + HTTP) |
@@ -34,7 +34,7 @@ Monorepo hạ tầng Tailscale tự host: DERP management, latency monitoring, H
 | api-center | `ghcr.io/vanbienperu3107/api-center:latest` | vpn2, vpn6 | 8787 |
 | admin-ui | `ghcr.io/vanbienperu3107/admin-ui:latest` | vpn2, vpn6 | 80 |
 | derp-relay | `ghcr.io/vanbienperu3107/derp-relay:latest` | vpn2,3,4,6 | 8080 (DERP), 3478 UDP |
-| latency | `ghcr.io/vanbienperu3107/latency:latest` | vpn2 only | 8090 |
+| latency | `ghcr.io/vanbienperu3107/latency:latest` | vpn2 only | — |
 | collector-sidecar | `ghcr.io/vanbienperu3107/collector-sidecar:latest` | vpn2 only | — |
 | gateway | `ghcr.io/vanbienperu3107/gateway:latest` | vpn2 only | 80, 443 |
 | exit-node | `ghcr.io/vanbienperu3107/exit-node:latest` | any VPS | 1080, 8118 |

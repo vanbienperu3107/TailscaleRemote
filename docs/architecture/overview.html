@@ -118,7 +118,7 @@
           <td>5</td>
           <td><code>latency</code></td>
           <td><code>modules/latency</code></td>
-          <td>node-dedup + latency collector server + metrics SQLite DB</td>
+          <td>node-dedup + server ping + auto-approve routes — ghi vào Neon via api-center</td>
           <td>vpn2 only</td>
         </tr>
         <tr>
@@ -186,7 +186,7 @@ Gateway (Caddy)                               Caddy (system install + snippet)
 vpn3 (64.176.23.196) — Standalone DERP Relay
   domain: vpn3.hangocthanh.io.vn
   └─ derp-relay container (DERP WebSocket + STUN)
-     └─ ping-reporter → tailnet → collector:8090 (vpn2)
+     └─ ping-reporter → tailnet → collector:8090 → socat → api-center:8787 (vpn2)
 
 vpn4 — Standalone DERP Relay (tương tự vpn3)
 
@@ -226,21 +226,23 @@ exit-node — Bất kỳ VPS
         → tailnet (qua Tailscale IP)
         → collector-sidecar:8090 trên vpn2
         → socat bridge
-        → latency service :8090
-        → ghi vào SQLite /data/devices.db</code></pre>
+        → api-center:8787
+        → Neon Postgres (latency_samples)</code></pre>
 
     <h3>4.5 Latency ping từ server (vpn2 → peers)</h3>
     <pre><code>latency service (vpn2)
     → unix socket ts_sock (shared volume)
     → Tailscale LocalAPI
     → ping tới mọi peer trong tailnet
-    → ghi kết quả vào SQLite</code></pre>
+    → POST api-center:8787/api/metrics/report
+    → Neon Postgres (latency_samples)</code></pre>
 
     <h3>4.6 Windows client-mod — Latency</h3>
     <pre><code>client-mod (Windows)
     → kết nối tailnet
     → collector:8090 trên vpn2 (qua tailnet IP)
-    → latency DB update</code></pre>
+    → socat bridge → api-center:8787/api/metrics/report
+    → Neon Postgres (latency_samples)</code></pre>
 
     <h3>4.7 Dynamic DERPMap — Pull định kỳ</h3>
     <pre><code>derp-controller (headscale) — mỗi 10 giây
@@ -272,11 +274,6 @@ exit-node — Bất kỳ VPS
           <td><code>derp_relay_certs</code></td>
           <td><code>/certs</code> (derp-relay)</td>
           <td>TLS certificates cho DERP relay</td>
-        </tr>
-        <tr>
-          <td><code>latency_data</code></td>
-          <td><code>/data</code> (latency)</td>
-          <td>SQLite database <code>/data/devices.db</code></td>
         </tr>
         <tr>
           <td><code>collector_state</code></td>

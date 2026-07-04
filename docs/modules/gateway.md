@@ -56,10 +56,6 @@ File: `deploy/vpn2/Caddyfile`
   handle /generate_204   { respond 204 }
   handle /app/api/*      { reverse_proxy api-center:8787 }
   handle /app/*          { reverse_proxy admin-ui:80 }
-  handle /derp-status*   {
-    uri strip_prefix /derp-status
-    reverse_proxy latency:8090
-  }
   @root path /
   handle @root { redir * /app/ 302 }
   handle { reverse_proxy derp-controller:8080 }
@@ -80,7 +76,6 @@ File: `deploy/vpn2/Caddyfile`
 | `/generate_204` | — | — | Connectivity check, trả `204 No Content` |
 | `/app/api/*` | `api-center` | `8787` | Backend API của dashboard |
 | `/app/*` | `admin-ui` | `80` | Frontend dashboard (SPA) |
-| `/derp-status*` | `latency` | `8090` | DERP status page (strip prefix `/derp-status`) |
 | `/` (exact) | — | — | Redirect `302` → `/app/` |
 | `*` (fallback) | `derp-controller` | `8080` | Mọi path không khớp → Headscale |
 

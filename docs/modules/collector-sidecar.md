@@ -15,9 +15,9 @@
 `collector-sidecar` là một container Tailscale chuyên dụng chạy cạnh `latency` trên vpn2, đảm nhiệm hai nhiệm vụ:
 
 1. **Join tailnet với hostname "collector"** — cung cấp unix socket LocalAPI để `latency` module dùng khi tự ping các peer.
-2. **socat TCP port forward** — nhận traffic từ tailnet (relay nodes gửi metrics report) và forward vào `latency` container trong Docker network.
+2. **socat TCP port forward** — nhận traffic từ tailnet (relay nodes gửi metrics report) và forward vào `api-center` container trong Docker network.
 
-Thiết kế sidecar này tách biệt network (Tailscale) khỏi application logic (`latency`), giúp `latency` không cần tự quản lý Tailscale connection.
+Thiết kế sidecar này tách biệt network (Tailscale) khỏi application logic, giúp `api-center` nhận được metrics trực tiếp từ tailnet mà không cần tự quản lý Tailscale connection.
 
 ## Kiến trúc
 
@@ -26,7 +26,7 @@ Thiết kế sidecar này tách biệt network (Tailscale) khỏi application lo
   (relay nodes)                         ┌──────────────────────────────────────┐
                                         │                                      │
   reporter.py                           │  ┌────────────────────────────┐     │
-  POST metrics/report                   │  │    collector-sidecar        │     │
+  POST /api/metrics/report              │  │    collector-sidecar        │     │
       │                                 │  │                            │     │
       │ (qua tailnet)                   │  │  tailscaled                │     │
       └────────────────────────────────►│  │    hostname: collector     │     │
@@ -34,14 +34,14 @@ Thiết kế sidecar này tách biệt network (Tailscale) khỏi application lo
                                         │  │                            │     │
                                         │  │  socat                     │     │
                                         │  │    LISTEN :8090            │     │
-                                        │  │    → TCP:latency:8090      │     │
+                                        │  │    → TCP:api-center:8787   │     │
                                         │  └─────────┬──────────────────┘     │
                                         │            │                         │
                                         │            │ Docker network          │
                                         │            ▼                         │
                                         │  ┌────────────────────────────┐     │
-                                        │  │       latency              │     │
-                                        │  │       :8090                │     │
+                                        │  │       api-center           │     │
+                                        │  │       :8787                │     │
                                         │  └────────────────────────────┘     │
                                         │                                      │
                                         │   ts_sock volume                     │
@@ -81,7 +81,7 @@ tailscale up \
   --authkey="${TS_AUTHKEY}" \
   ${TS_EXTRA_ARGS}
 
-# Start socat port forward: tailnet port → latency container
+# Start socat port forward: tailnet port → api-center container
 socat TCP-LISTEN:${FORWARD_PORT},fork,reuseaddr \
       TCP:${FORWARD_TARGET} &
 
@@ -94,7 +94,7 @@ wait $TS_PID
 1. **tailscaled start**: Daemon Tailscale khởi động, tạo unix socket tại `TS_SOCKET`. Socket này được mount vào volume `ts_sock` để `latency` có thể dùng.
 2. **sleep 3**: Chờ tailscaled ổn định trước khi gọi `tailscale up`.
 3. **tailscale up**: Join tailnet với pre-auth key. `TS_EXTRA_ARGS` cho phép truyền thêm flags như `--login-server`, `--hostname`, `--accept-dns=false`.
-4. **socat**: Mở port `FORWARD_PORT` (8090) để nhận TCP connection, fork cho mỗi connection mới, forward đến `FORWARD_TARGET` (latency:8090) trong Docker network.
+4. **socat**: Mở port `FORWARD_PORT` (8090) để nhận TCP connection, fork cho mỗi connection mới, forward đến `FORWARD_TARGET` (api-center:8787) trong Docker network.
 5. **wait**: Block trên `tailscaled` PID để container không exit.
 
 ## Environment Variables
@@ -105,7 +105,7 @@ wait $TS_PID
 | `TS_EXTRA_ARGS` | — | Không | Flags bổ sung cho `tailscale up`. Ví dụ: `--login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false` |
 | `TS_STATE_DIR` | `/var/lib/tailscale` | Không | Thư mục lưu state file của tailscaled |
 | `TS_SOCKET` | `/var/run/tailscale/tailscaled.sock` | Không | Đường dẫn unix socket của tailscaled |
-| `FORWARD_TARGET` | `latency:8090` | Không | Địa chỉ target mà socat forward đến (tên service trong Docker network) |
+| `FORWARD_TARGET` | `api-center:8787` | Không | Địa chỉ target mà socat forward đến (tên service trong Docker network) |
 | `FORWARD_PORT` | `8090` | Không | Port socat lắng nghe trên tailnet interface |
 
 ### Ví dụ TS_EXTRA_ARGS
@@ -158,7 +158,8 @@ collector-sidecar:
     TS_EXTRA_ARGS: --login-server=https://vpn2.hangocthanh.io.vn --hostname=collector --accept-dns=false
     TS_STATE_DIR: /var/lib/tailscale
     TS_SOCKET: /var/run/tailscale/tailscaled.sock
-    FORWARD_TARGET: latency:8090
+    # socat forward: tailnet port 8090 → api-center:8787 (Docker network)
+    FORWARD_TARGET: api-center:8787
     FORWARD_PORT: "8090"
   volumes:
     - collector_state:/var/lib/tailscale
@@ -172,14 +173,12 @@ latency:
   image: ghcr.io/vanbienperu3107/latency:latest
   restart: unless-stopped
   volumes:
-    - latency_data:/data
-    - ts_sock:/var/run/tailscale   # Dùng socket của collector-sidecar
-  # ...
+    - ts_sock:/var/run/tailscale   # Dùng socket của collector-sidecar để LocalAPI ping
+  # Không còn latency_data volume (SQLite đã xóa)
 
 volumes:
   collector_state:
   ts_sock:
-  latency_data:
 ```
 
 ## COUPLING với latency
@@ -188,9 +187,9 @@ volumes:
 
 | Dependency | Hướng | Lý do |
 |---|---|---|
-| `ts_sock` volume | collector-sidecar → latency | latency đọc unix socket để dùng LocalAPI |
-| Docker network | socat (sidecar) → latency:8090 | socat forward traffic từ tailnet vào latency |
-| `FORWARD_TARGET=latency:8090` | sidecar cần resolve hostname `latency` | Phải trong cùng Docker network |
+| `ts_sock` volume | collector-sidecar → latency | latency đọc unix socket để dùng LocalAPI ping |
+| Docker network | socat (sidecar) → api-center:8787 | socat forward traffic từ tailnet vào api-center |
+| `FORWARD_TARGET=api-center:8787` | sidecar cần resolve hostname `api-center` | Phải trong cùng Docker network |
 
 Khi di chuyển sang host mới, **di chuyển cả hai container cùng lúc** và đảm bảo volumes được migrate đúng cách.
 
@@ -198,6 +197,6 @@ Khi di chuyển sang host mới, **di chuyển cả hai container cùng lúc** v
 
 - **Pre-auth key:** Nên dùng pre-auth key loại **reusable + ephemeral=false** để container có thể restart mà không cần tạo key mới. Key hết hạn = container không join được tailnet = mọi relay node mất kết nối đến collector.
 - **socat fork mode:** `fork` trong `socat TCP-LISTEN:8090,fork,...` cho phép xử lý nhiều connection đồng thời. Không có `fork` thì chỉ xử lý được một connection tại một thời điểm.
-- **IP mất do socat:** Do socat forward TCP, collector (latency module) nhìn thấy source IP là Docker bridge, không phải IP tailnet của relay node. Đây là lý do latency module phải chấp nhận Docker network range trong IP-based auth.
+- **IP mất do socat:** Do socat forward TCP, api-center nhìn thấy source IP là Docker bridge, không phải IP tailnet của relay node. Đây là lý do api-center chấp nhận Docker network range trong IP-based auth cho `/api/metrics/report`.
 - **Restart behavior:** Khi restart container, `collector_state` volume giữ node identity nên không cần re-auth từ đầu (nếu dùng reusable key). State persist đồng nghĩa node giữ nguyên IP tailnet.
 - **tailscale up idempotent:** Gọi lại `tailscale up` khi đã connected chỉ cập nhật flags, không tạo node mới.
