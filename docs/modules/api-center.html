@@ -205,7 +205,7 @@
         <td><span class="method get">GET</span></td>
         <td><code>/derpmap.json</code></td>
         <td><span class="badge badge-gray">—</span></td>
-        <td>Dynamic DERPMap cho headscale poll mỗi 10s</td>
+        <td>Dynamic DERPMap, dựng từ <code>derp_servers</code> (<code>enabled &amp;&amp; !paused &amp;&amp; !embedded</code>). Hai người tiêu thụ: (1) DERP-Controller poll mỗi 10s để phân phối DERPMap cho client; (2) job <code>discover</code> trong <code>.github/workflows/module-derp-relay.yml</code> — CI đọc route public này qua Caddy (<code>deploy/vpn2/Caddyfile</code>: <code>handle /derpmap.json { reverse_proxy api-center:8787 }</code>) để tự sinh matrix relay node cần deploy, không hardcode vpn3/vpn4/vpn6 trong YAML nữa. Đây là <strong>nguồn duy nhất</strong> cho cả headscale lẫn CI.</td>
       </tr>
       <tr>
         <td><span class="method get">GET</span></td>
