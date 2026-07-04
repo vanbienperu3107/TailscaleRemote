@@ -370,6 +370,15 @@ Health check: HTTPS GET /healthz
   → Interval: 30s, threshold: 2 failures
 Failover: automatic, DNS TTL 30s</code></pre>
 
+    <h3>7.6 module-derp-relay.yml — discover-from-DB thay vì hardcode node</h3>
+    <p>Workflow không còn định nghĩa cứng <code>deploy-vpn3</code>/<code>deploy-vpn4</code>/<code>deploy-vpn6</code>. Thay vào đó:</p>
+    <ul>
+      <li><strong><code>discover</code></strong>: <code>curl</code> <code>/derpmap.json</code> (mặc định <code>https://vpn2.hangocthanh.io.vn/derpmap.json</code>, override qua repo variable <code>DERPMAP_URL</code>) — endpoint public do api-center dựng từ bảng <code>derp_servers</code> (Neon), chỉ gồm node <code>enabled &amp;&amp; !paused &amp;&amp; !embedded</code>. Kết quả build thành GitHub Actions matrix <code>{name, hostname, num}</code> (num = chữ số trong tên node).</li>
+      <li><strong><code>deploy-relay</code></strong> (matrix job): với mỗi node, tra secret SSH theo quy ước <code>VPN{num}_HOST/_USER/_SSH_KEY</code>. Thiếu secret → job cảnh báo và bỏ qua node đó (không fail toàn bộ workflow).</li>
+      <li><strong><code>deploy-vpn2</code></strong>: vẫn tách riêng vì vpn2 là node control/embedded, không nằm trong <code>derp_servers</code>.</li>
+    </ul>
+    <div class="note">Hệ quả: <strong>thêm một relay node mới chỉ cần thêm vào DB (qua Admin-UI) + khai 3 secret <code>VPN{N}_*</code></strong> — không phải sửa file workflow. <code>/derpmap.json</code> vừa là nguồn DERPMap cho headscale, vừa là nguồn duy nhất cho CI xác định tập relay node cần deploy.</div>
+
     <hr>
 
     <h2>8. CI/CD flow</h2>
@@ -405,7 +414,7 @@ deploy-control-plane.yml
         <tr><td><code>module-derp-controller.yml</code></td><td>push <code>modules/derp-controller/**</code></td><td>build + push GHCR</td></tr>
         <tr><td><code>module-api-center.yml</code></td><td>push <code>modules/api-center/**</code></td><td>build + push GHCR</td></tr>
         <tr><td><code>module-admin-ui.yml</code></td><td>push <code>modules/admin-ui/**</code></td><td>build + push GHCR</td></tr>
-        <tr><td><code>module-derp-relay.yml</code></td><td>push <code>modules/derp-relay/**</code></td><td>build + push + deploy vpn3</td></tr>
+        <tr><td><code>module-derp-relay.yml</code></td><td>push <code>modules/derp-relay/**</code></td><td>build + push GHCR; job <code>discover</code> fetch <code>/derpmap.json</code> → matrix <code>deploy-relay</code> deploy tới mọi relay node active trong DB (không hardcode vpn3/vpn4/vpn6); job <code>deploy-vpn2</code> riêng cho node embedded</td></tr>
         <tr><td><code>module-latency.yml</code></td><td>push <code>modules/latency/**</code></td><td>build + push GHCR</td></tr>
         <tr><td><code>module-collector-sidecar.yml</code></td><td>push <code>modules/collector-sidecar/**</code></td><td>build + push GHCR</td></tr>
         <tr><td><code>module-gateway.yml</code></td><td>push <code>modules/gateway/**</code></td><td>build + push GHCR</td></tr>
