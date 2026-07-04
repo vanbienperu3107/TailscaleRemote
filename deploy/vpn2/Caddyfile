@@ -21,6 +21,9 @@
   handle /generate_204   { respond 204 }
 
   # ── Admin-UI và Api-center ────────────────────────────────────────────────
+  # DERPMap công khai (không auth) — headscale + CI deploy relay đọc danh sách
+  # node từ đây. Là nguồn duy nhất (DB derp_servers) do api-center dựng ra.
+  handle /derpmap.json   { reverse_proxy api-center:8787 }
   handle /app/api/*      { reverse_proxy api-center:8787 }
   handle /app/*          { reverse_proxy admin-ui:80 }
 
