@@ -71,7 +71,46 @@ jobs:
           load: ${{ github.event_name == 'pull_request' }}
           tags: ${{ env.IMAGE }}:latest,${{ env.IMAGE }}:${{ github.sha }}
 
-  # ── 4. Deploy to all relay nodes ──────────────────────────────────────────────
+  # ── 4. Khám phá danh sách relay node QUA API (nguồn duy nhất là DB) ───────────
+  # Không còn hardcode tập vpn3/vpn4/vpn6. Đọc /derpmap.json của api-center — endpoint
+  # public do chính api-center dựng từ bảng derp_servers (Neon), chỉ gồm node đang
+  # enabled & !paused & !embedded. CI không cần credential DB; api-center là lớp
+  # truy cập duy nhất. Mỗi Node -> 1 target deploy: Name = REPORTER_NAME,
+  # HostName = DERP_HOSTNAME, và số N trong Name để tra secret VPN{N}_*.
+  # URL override được qua repo variable DERPMAP_URL.
+  discover:
+    name: Khám phá relay node qua API
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    outputs:
+      matrix: ${{ steps.q.outputs.matrix }}
+      count: ${{ steps.q.outputs.count }}
+    steps:
+      - name: Fetch /derpmap.json và dựng matrix
+        id: q
+        env:
+          DERPMAP_URL: ${{ vars.DERPMAP_URL || 'https://vpn2.hangocthanh.io.vn/derpmap.json' }}
+        run: |
+          echo "Đọc danh sách relay từ: $DERPMAP_URL"
+          body=$(curl -fsS --max-time 20 "$DERPMAP_URL") || {
+            echo "::error::Không fetch được $DERPMAP_URL — kiểm tra api-center + route Caddy /derpmap.json"
+            exit 1
+          }
+          # Regions.*.Nodes[] -> {name: Name, hostname: HostName, num: chữ số trong Name}.
+          # Region embedded (vpn2) đã bị api-center loại khỏi /derpmap.json.
+          matrix=$(echo "$body" | jq -c '
+            { include: [ .Regions[]?.Nodes[]?
+                | { name: .Name, hostname: .HostName,
+                    num: (.Name | gsub("[^0-9]";"")) }
+                | select(.num != "") ] }')
+          count=$(echo "$matrix" | jq '.include | length')
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Phát hiện $count relay node."
+          echo "$matrix" | jq .
+
+  # ── 5a. Deploy vpn2 (node control/embedded — không nằm trong derp_servers) ─────
   deploy-vpn2:
     name: Deploy derp-relay → vpn2
     runs-on: ubuntu-latest
@@ -91,59 +130,35 @@ jobs:
             docker compose up -d --no-deps derp-relay
             echo "derp-relay vpn2 OK"
 
-  deploy-vpn3:
-    name: Deploy derp-relay → vpn3
+  # ── 5b. Deploy các relay node theo matrix sinh từ DB ──────────────────────────
+  # Secret SSH tra động theo quy ước VPN{num}_HOST/_USER/_SSH_KEY. Node mới thêm
+  # vào DB chỉ cần khai 3 secret tương ứng là tự được deploy — không sửa workflow.
+  deploy-relay:
+    name: Deploy derp-relay → ${{ matrix.name }}
     runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
+    needs: [build, discover]
+    if: github.ref == 'refs/heads/main' && needs.discover.outputs.count != '0'
     continue-on-error: true
     environment: production
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.matrix) }}
     steps:
+      - name: Kiểm tra có secret SSH cho ${{ matrix.name }}
+        env:
+          H: ${{ secrets[format('VPN{0}_HOST', matrix.num)] }}
+        run: |
+          if [ -z "$H" ]; then
+            echo "::warning::Không có secret VPN${{ matrix.num }}_HOST cho node ${{ matrix.name }} (${{ matrix.hostname }}) — bỏ qua deploy. Thêm secret để tự deploy."
+            exit 1
+          fi
       - uses: appleboy/ssh-action@v1
         with:
-          host: ${{ secrets.VPN3_HOST }}
-          username: ${{ secrets.VPN3_USER }}
-          key: ${{ secrets.VPN3_SSH_KEY }}
+          host: ${{ secrets[format('VPN{0}_HOST', matrix.num)] }}
+          username: ${{ secrets[format('VPN{0}_USER', matrix.num)] }}
+          key: ${{ secrets[format('VPN{0}_SSH_KEY', matrix.num)] }}
           script: |
             cd /opt/tailscale-remote/deploy/relay
-            DERP_HOSTNAME=vpn3.hangocthanh.io.vn REPORTER_NAME=vpn3 \
+            DERP_HOSTNAME=${{ matrix.hostname }} REPORTER_NAME=${{ matrix.name }} \
             docker compose pull && docker compose up -d --force-recreate
-            echo "derp-relay vpn3 OK"
-
-  deploy-vpn4:
-    name: Deploy derp-relay → vpn4
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    continue-on-error: true
-    environment: production
-    steps:
-      - uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPN4_HOST }}
-          username: ${{ secrets.VPN4_USER }}
-          key: ${{ secrets.VPN4_SSH_KEY }}
-          script: |
-            cd /opt/tailscale-remote/deploy/relay
-            DERP_HOSTNAME=vpn4.hangocthanh.io.vn REPORTER_NAME=vpn4 \
-            docker compose pull && docker compose up -d --force-recreate
-            echo "derp-relay vpn4 OK"
-
-  deploy-vpn6:
-    name: Deploy derp-relay → vpn6
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    continue-on-error: true
-    environment: production
-    steps:
-      - uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPN6_HOST }}
-          username: ${{ secrets.VPN6_USER }}
-          key: ${{ secrets.VPN6_SSH_KEY }}
-          script: |
-            cd /opt/tailscale-remote/deploy/relay
-            DERP_HOSTNAME=vpn6.hangocthanh.io.vn REPORTER_NAME=vpn6 \
-            docker compose pull && docker compose up -d --force-recreate
-            echo "derp-relay vpn6 OK"
+            echo "derp-relay ${{ matrix.name }} OK"
