@@ -226,7 +226,10 @@ go build -o tailscaled.exe ./cmd/tailscaled/</code></pre>
 100.64.x.x:8090  (Tailnet IP cua collector-sidecar)
     | socat trong collector-sidecar
     v
-latency:8090  (Docker network tren vpn2)</code></pre>
+api-center:8787  (Docker network tren vpn2)
+    | POST /api/metrics/report
+    v
+Neon Postgres (latency_samples)</code></pre>
     <div class="note">Nếu <code>collector-sidecar</code> offline, report thất bại silently (goroutine log error và tiếp tục đến lần tiếp theo sau 30s). Không ảnh hưởng hoạt động Tailscale cốt lõi.</div>
 
     <h2>Lưu ý quan trọng</h2>

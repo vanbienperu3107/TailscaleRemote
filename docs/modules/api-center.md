@@ -41,7 +41,7 @@ Hub API trung tâm. Toàn bộ hệ thống (Admin-UI, DERP-Controller, Latency,
 
 | Method | Path | Auth | Mô tả |
 |--------|------|------|-------|
-| GET | `/derpmap.json` | — | Dynamic DERPMap cho headscale poll mỗi 10s |
+| GET | `/derpmap.json` | — | Dynamic DERPMap, dựng từ `derp_servers` (`enabled && !paused && !embedded`). Hai người tiêu thụ: (1) DERP-Controller poll mỗi 10s để phân phối DERPMap cho client; (2) job `discover` trong `.github/workflows/module-derp-relay.yml` — CI đọc route public này qua Caddy (`deploy/vpn2/Caddyfile`: `handle /derpmap.json { reverse_proxy api-center:8787 }`) để tự sinh matrix relay node cần deploy, không hardcode vpn3/vpn4/vpn6 trong YAML nữa. Đây là **nguồn duy nhất** cho cả headscale lẫn CI. |
 | GET | `/api/internal/derp-map/:nodeKey` | Semi-public | Per-node DERPMap cho Feature B |
 
 ### Machines & Users
@@ -65,14 +65,19 @@ Hub API trung tâm. Toàn bộ hệ thống (Admin-UI, DERP-Controller, Latency,
 | GET | `/api/acl` | Required | Lấy ACL policy hiện tại |
 | PUT | `/api/acl` | Required | Cập nhật ACL policy |
 
-### Latency & Metrics
+### Latency, Devices & Metrics
 
 | Method | Path | Auth | Mô tả |
 |--------|------|------|-------|
 | GET | `/api/latency` | Required | Aggregated peer-to-peer latency từ Neon DB |
-| POST | `/api/metrics/report` | IP-based | Nhận latency report từ Client Mod + DERP Relay |
+| POST | `/api/metrics/report` | IP-based | Nhận latency report từ Client Mod, DERP Relay và latency module |
+| POST | `/api/metrics/netcheck` | IP-based | Nhận `tailscale netcheck` result từ client |
+| GET | `/api/metrics/health` | Public | Smoke gate sau deploy — kiểm tra reporter có báo cáo gần đây không |
+| GET | `/api/devices` | Required | Danh sách thiết bị từ node dedup history (latency module ghi) |
+| POST | `/api/devices/report` | IP-based | Latency module upsert device info sau mỗi poll headscale API |
+| GET | `/api/netcheck` | Required | Latest `tailscale netcheck` per client |
 
-**Auth cho `/api/metrics/report`:** IP trong tailnet (100.x.x.x) hoặc Docker internal network. Không cần OAuth session.
+**`/api/metrics/health`:** `?expect=collector,vpn3,vpn4&window=180` → 200 `{ok:true}` hoặc 503 `{ok:false, stale:[...]}`. Dùng trong deploy workflow.
 
 ### Force Routes
 
@@ -128,16 +133,44 @@ Hub API trung tâm. Toàn bộ hệ thống (Admin-UI, DERP-Controller, Latency,
 **Logic DERPMap:** `enabled=true AND paused=false AND embedded=false`. Priority → RegionScore (inverted, 0.01–10).
 
 ### `latency_samples`
-| Column | Type |
-|--------|------|
-| srcHostname, dstHostname | text (composite PK) |
-| srcIp, mac | text |
-| rttMs | real |
-| path | text (`direct` / `derp:vpn3-vn`) |
-| ok | bool |
-| reportedAt | timestamp |
 
-UPSERT mỗi lần nhận report → giữ bản mới nhất.
+| Column                   | Type                          |
+|--------------------------|-------------------------------|
+| srcHostname, dstHostname | text (composite PK)           |
+| srcIp, mac               | text                          |
+| rttMs                    | real                          |
+| path                     | text (direct or derp:code)    |
+| ok                       | bool                          |
+| reportedAt               | timestamptz                   |
+
+UPSERT mỗi lần nhận report → giữ bản mới nhất. Nguồn: client (metrics-report.ps1), relay nodes (reporter.py), latency module (server ping via collector).
+
+### `devices`
+
+| Column      | Type                |
+|-------------|---------------------|
+| userName    | text (PK part)      |
+| hostname    | text (PK part)      |
+| mac         | text (nullable)     |
+| nodeId      | text                |
+| ipv4        | text                |
+| machineKey  | text                |
+| firstSeen   | timestamptz         |
+| lastSeen    | timestamptz         |
+| seenCount   | integer             |
+
+Thay thế SQLite `devices.db`. Ghi bởi latency module sau mỗi poll headscale API. MAC được cập nhật khi client gửi metrics report.
+
+### `client_netcheck`
+
+| Column        | Type        |
+|---------------|-------------|
+| client        | text PK     |
+| preferredDerp | text        |
+| regionLatency | text (JSON) |
+| reportedAt    | timestamptz |
+
+Latest `tailscale netcheck` per client. UPSERT theo hostname.
 
 ### `derp_force_routes`
 Bảng lưu (clientIp, regionId) pairs cho iptables DERP-FORCE chain.

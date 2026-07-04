@@ -318,18 +318,6 @@ Status:      Active</code></pre>
     </div>
 
     <div class="step">
-      <div class="step-num">7</div>
-      <div class="step-body">
-        <h2 style="margin-top:0">Cập nhật DERP probe URLs cho latency monitor</h2>
-        <p>Secret <code>DERP_PROBE_URLS</code> chứa danh sách các relay node để <code>latency</code> module monitor:</p>
-        <pre><code># Format: "region-code=probe-url,region-code=probe-url,..."
-gh secret set DERP_PROBE_URLS --body "vpn2-vn=https://vpn2.hangocthanh.io.vn/derp/probe,vpn3-vn=https://vpn3.hangocthanh.io.vn/derp/probe,vpn4-vn=https://vpn4.hangocthanh.io.vn/derp/probe"</code></pre>
-        <p>Re-deploy latency module để nhận cấu hình mới:</p>
-        <pre><code>gh workflow run module-latency.yml</code></pre>
-      </div>
-    </div>
-
-    <div class="step">
       <div class="step-num">8</div>
       <div class="step-body">
         <h2 style="margin-top:0">Kiểm tra relay node hoạt động</h2>
