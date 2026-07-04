@@ -157,7 +157,6 @@ jobs:
           host: ${{ secrets[format('VPN{0}_HOST', matrix.num)] }}
           username: ${{ secrets[format('VPN{0}_USER', matrix.num)] }}
           key: ${{ secrets[format('VPN{0}_SSH_KEY', matrix.num)] }}
-          envs: DERP_HOSTNAME,REPORTER_NAME
           script: |
             cd /opt/tailscale-remote/deploy/relay
             DERP_HOSTNAME=${{ matrix.hostname }} REPORTER_NAME=${{ matrix.name }} \
